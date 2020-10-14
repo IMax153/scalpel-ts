@@ -1,14 +1,17 @@
-import type { Alt1 } from 'fp-ts/lib/Alt'
-import type { Alternative1 } from 'fp-ts/lib/Alternative'
-import type { Applicative1 } from 'fp-ts/lib/Applicative'
-import type { Apply1 } from 'fp-ts/lib/Apply'
-import type { Functor1 } from 'fp-ts/lib/Functor'
-import type { Monad1 } from 'fp-ts/lib/Monad'
+import type { Alt1 } from 'fp-ts/Alt'
+import type { Alternative1 } from 'fp-ts/Alternative'
+import type { Applicative1 } from 'fp-ts/Applicative'
+import type { Apply1 } from 'fp-ts/Apply'
+import type { Compactable1, Separated } from 'fp-ts/Compactable'
+import type { Either } from 'fp-ts/Either'
+import type { Filter1, Filterable1, Partition1 } from 'fp-ts/Filterable'
+import type { Functor1 } from 'fp-ts/Functor'
+import type { Monad1 } from 'fp-ts/Monad'
 import * as M from 'fp-ts/Monoid'
 import * as O from 'fp-ts/Option'
 import * as R from 'fp-ts/Reader'
 import * as RA from 'fp-ts/ReadonlyArray'
-import { flow, identity, not, pipe, Lazy, Predicate, Refinement } from 'fp-ts/lib/function'
+import { flow, identity, not, pipe, Lazy, Predicate, Refinement } from 'fp-ts/function'
 
 import * as T from './Html/Token'
 import { select, Selector } from './Select'
@@ -316,6 +319,14 @@ const map_: Functor1<URI>['map'] = (fa, f) => pipe(fa, map(f))
 const ap_: Apply1<URI>['ap'] = (fab, fa) => pipe(fab, ap(fa))
 const chain_: Monad1<URI>['chain'] = (ma, f) => pipe(ma, chain(f))
 const alt_: Alternative1<URI>['alt'] = (fa, that) => pipe(fa, alt(that))
+const filter_: Filter1<URI> = <A>(fa: Scraper<A>, f: Predicate<A>): Scraper<A> =>
+  pipe(fa, filter(f))
+const filterMap_: Filterable1<URI>['filterMap'] = (fa, f) => pipe(fa, filterMap(f))
+const partition_: Partition1<URI> = <A>(
+  fa: Scraper<A>,
+  f: Predicate<A>
+): Separated<Scraper<A>, Scraper<A>> => pipe(fa, partition(f))
+const partitionMap_: Filterable1<URI>['partitionMap'] = (fa, f) => pipe(fa, partitionMap(f))
 
 // -------------------------------------------------------------------------------------
 // pipeables
@@ -403,6 +414,59 @@ export const alt: <A>(that: Lazy<Scraper<A>>) => (fa: Scraper<A>) => Scraper<A> 
  */
 export const zero: Alternative1<URI>['zero'] = () => none
 
+/**
+ * @category Compactable
+ * @since 0.0.1
+ */
+export const compact: <A>(fa: Scraper<O.Option<A>>) => Scraper<A> = R.map(O.compact)
+
+/**
+ * @category Compactable
+ * @since 0.0.1
+ */
+export const separate: <A, B>(ma: Scraper<Either<A, B>>) => Separated<Scraper<A>, Scraper<B>> = (
+  ma
+) => {
+  const left = pipe(ma, map(O.getLeft), compact)
+  const right = pipe(ma, map(O.getRight), compact)
+  return { left, right }
+}
+/**
+ * @category Filterable
+ * @since 0.0.1
+ */
+export const filter: {
+  <A, B extends A>(refinement: Refinement<A, B>): (fa: Scraper<A>) => Scraper<B>
+  <A>(predicate: Predicate<A>): (fa: Scraper<A>) => Scraper<A>
+} = <A>(f: Predicate<A>) => (fa: Scraper<A>): Scraper<A> => pipe(fa, R.map(O.filter(f)))
+
+/**
+ * @category Filterable
+ * @since 0.0.1
+ */
+export const filterMap: <A, B>(f: (a: A) => O.Option<B>) => (fa: Scraper<A>) => Scraper<B> = (
+  f
+) => (fa) => pipe(fa, R.map(O.filterMap(f)))
+
+export const partition: {
+  <A, B extends A>(refinement: Refinement<A, B>): (
+    fa: Scraper<A>
+  ) => Separated<Scraper<A>, Scraper<B>>
+  <A>(predicate: Predicate<A>): (fa: Scraper<A>) => Separated<Scraper<A>, Scraper<A>>
+} = <A>(f: Predicate<A>) => (fa: Scraper<A>): Separated<Scraper<A>, Scraper<A>> => {
+  const left = pipe(fa, filter(not(f)))
+  const right = pipe(fa, filter(f))
+  return { left, right }
+}
+
+export const partitionMap: <A, B, C>(
+  f: (a: A) => Either<B, C>
+) => (fa: Scraper<A>) => Separated<Scraper<B>, Scraper<C>> = (f) => (fa) => {
+  const left = pipe(fa, filterMap(flow(f, O.getLeft)))
+  const right = pipe(fa, filterMap(flow(f, O.getRight)))
+  return { left, right }
+}
+
 // -------------------------------------------------------------------------------------
 // instances
 // -------------------------------------------------------------------------------------
@@ -488,6 +552,31 @@ export const Alternative: Alternative1<URI> = {
   of,
   alt: alt_,
   zero
+}
+
+/**
+ * @category instances
+ * @since 0.0.1
+ */
+export const Compactable: Compactable1<URI> = {
+  URI,
+  compact,
+  separate
+}
+
+/**
+ * @category instances
+ * @since 0.0.1
+ */
+export const Filterable: Filterable1<URI> = {
+  URI,
+  map: map_,
+  compact,
+  separate,
+  filter: filter_,
+  filterMap: filterMap_,
+  partition: partition_,
+  partitionMap: partitionMap_
 }
 
 // -------------------------------------------------------------------------------------
