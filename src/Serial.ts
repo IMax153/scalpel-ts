@@ -96,7 +96,7 @@ import * as T from 'fp-ts/Tuple'
 import { flow, identity, pipe, Endomorphism, Lazy } from 'fp-ts/function'
 import * as Z from 'fp-ts-contrib/Zipper'
 
-import { TagSpec } from '../Select/TagSpec'
+import { TagSpec } from './Types/TagSpec'
 import type { Scraper } from './Scraper'
 
 // -------------------------------------------------------------------------------------

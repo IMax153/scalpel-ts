@@ -1,5 +1,5 @@
 import type { Token } from '../Html/Token'
-import { SelectContext } from './SelectContext'
+import type { SelectContext } from '../Select'
 import { fromTokenInfo, TagForest } from './TagForest'
 import { annotateTokens, TokenInfo } from './TokenInfo'
 
@@ -47,6 +47,5 @@ export const TagSpec = (
 export const tokensToSpec = (tokens: ReadonlyArray<Token>): TagSpec => {
   const annotatedTokens = annotateTokens(tokens)
   const hierarchy = fromTokenInfo(annotatedTokens)
-  const context = SelectContext(0, false)
-  return TagSpec(context, hierarchy, annotatedTokens)
+  return TagSpec({ position: 0, inChroot: false }, hierarchy, annotatedTokens)
 }

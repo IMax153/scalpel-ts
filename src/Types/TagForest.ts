@@ -2,10 +2,10 @@
  * @since 0.0.1
  */
 import * as A from 'fp-ts/Array' // `Tree` uses Array to represent the `Forest`
+import * as B from 'fp-ts/boolean'
 import * as O from 'fp-ts/Option'
 import * as RA from 'fp-ts/ReadonlyArray'
 import * as Tree from 'fp-ts/Tree'
-import * as B from 'fp-ts/boolean'
 import { pipe, Endomorphism, Predicate } from 'fp-ts/function'
 
 import type { TokenInfo } from './TokenInfo'
