@@ -142,7 +142,11 @@ export const scrape = <A>(scraper: Scraper<A>): ((tags: ReadonlyArray<T.Token>) 
  */
 export const chroots = (selector: Selector) => <A>(
   scraper: Scraper<A>
-): Scraper<ReadonlyArray<A>> => flow(select(selector), RA.traverse(O.Applicative)(scraper))
+): Scraper<ReadonlyArray<A>> =>
+  pipe(
+    ask(),
+    map((spec) => pipe(spec, select(selector), RA.map(scraper), RA.compact))
+  )
 
 /**
  * The `chroot` combinator takes a `Selector` and an inner `Scraper` and executes
