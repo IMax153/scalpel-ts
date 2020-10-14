@@ -242,8 +242,7 @@ export const tag = (name: string): Selector =>
  * @category constructors
  * @since 0.0.1
  */
-export const any = (predicates: ReadonlyArray<AttributePredicate>): Selector =>
-  F.pipe(Selection(SelectAny(predicates), defaultSelectSettings), RA.of)
+export const any: Selector = F.pipe(Selection(SelectAny(RA.empty), defaultSelectSettings), RA.of)
 
 /**
  * The `text` combinator creates a `Selector` that will match all text node
