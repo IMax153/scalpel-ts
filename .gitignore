@@ -105,3 +105,6 @@ dist/
 # Temporary folders
 tmp/
 temp/
+
+# Development folders
+dev/
