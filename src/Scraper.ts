@@ -677,7 +677,7 @@ const getAttribute = (
  * that matches the specified `key` on each token, if present.
  */
 const tagsToAttr = (key: string): ((spec: TagSpec) => O.Option<string>) =>
-  foldSpec(O.getApplyMonoid(M.monoidString))(
+  foldSpec(O.getMonoid(M.monoidString))(
     T.fold({
       TagOpen: (_, attrs) => pipe(attrs, getAttribute(key)),
       TagSelfClose: (_, attrs) => pipe(attrs, getAttribute(key)),
