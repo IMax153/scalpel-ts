@@ -1,10 +1,14 @@
 /**
  * @since 0.0.1
  */
+import type { Either } from 'fp-ts/Either'
 import type { Option } from 'fp-ts/Option'
+import type { TaskEither } from 'fp-ts/TaskEither'
+import * as E from 'fp-ts/Either'
 import * as M from 'fp-ts/Monoid'
 import * as O from 'fp-ts/Option'
 import * as RA from 'fp-ts/ReadonlyArray'
+import * as TE from 'fp-ts/TaskEither'
 import { flow, identity, not, pipe } from 'fp-ts/function'
 
 import type { Attribute } from './Internal/Html/Tokenizer'
@@ -14,6 +18,7 @@ import type { TagSpec } from './Internal/Tag/TagSpec'
 import * as T from './Internal/Html/Tokenizer'
 import * as RO from './Internal/ReaderOption'
 import * as TS from './Internal/Tag/TagSpec'
+import * as F from './Fetch'
 import * as S from './Select'
 
 export * from './Internal/ReaderOption'
@@ -41,6 +46,47 @@ export type Scraper<A> = ReaderOption<TagSpec, A>
  */
 export const scrape = <A>(scraper: Scraper<A>): ((tags: ReadonlyArray<T.Token>) => Option<A>) =>
   flow(TS.tokensToSpec, scrapeTagSpec(scraper))
+
+/**
+ * The `scrapeRaw` function executes a `Scraper` on the `source` and produces either
+ * a value of type `A` or an error message.
+ *
+ * @category scraping
+ * @since 0.0.1
+ */
+export const scrapeRaw = (source: string) => <A>(scraper: Scraper<A>): Either<string, A> =>
+  pipe(
+    T.parse(source),
+    E.chain(
+      flow(
+        scrape(scraper),
+        E.fromOption(() => 'Failed to scrape source')
+      )
+    )
+  )
+
+/**
+ * The `scrapeURL` function executes a `Scraper` on the source text from the specified
+ * `url` and returns a `Promise` which resolves to either a value of type `A` or an
+ * error message.
+ *
+ * @category scraping
+ * @since 0.0.1
+ */
+export const scrapeURL = (url: RequestInfo, init?: RequestInit) => <A>(
+  scraper: Scraper<A>
+): TaskEither<string, A> =>
+  pipe(
+    F.text(url, init),
+    TE.mapLeft(
+      F.foldError({
+        NetworkError: (message) => `[Network Error]: ${message}`,
+        DecodeError: (message) => `[Decode Error]: ${message}`,
+        ResponseError: (message, status) => `[Response Error]: Status ${status}, ${message}`
+      })
+    ),
+    TE.chainEitherK((source) => pipe(scraper, scrapeRaw(source)))
+  )
 
 // -------------------------------------------------------------------------------------
 // combinators
