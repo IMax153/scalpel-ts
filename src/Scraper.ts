@@ -1,26 +1,26 @@
 /**
  * @since 0.0.1
  */
+import type { Option } from 'fp-ts/Option'
 import * as M from 'fp-ts/Monoid'
 import * as O from 'fp-ts/Option'
 import * as RA from 'fp-ts/ReadonlyArray'
 import { flow, identity, not, pipe } from 'fp-ts/function'
 
+import type { Attribute } from './Internal/Html/Tokenizer'
+import type { ReaderOption } from './Internal/ReaderOption'
+import type { Selector } from './Select'
+import type { TagSpec } from './Internal/Tag/TagSpec'
 import * as T from './Internal/Html/Tokenizer'
 import * as RO from './Internal/ReaderOption'
 import * as TS from './Internal/Tag/TagSpec'
-import { select, Selector } from './Select'
+import * as S from './Select'
 
 export * from './Internal/ReaderOption'
 
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
-
-import Attribute = T.Attribute
-import Option = O.Option
-import ReaderOption = RO.ReaderOption
-import TagSpec = TS.TagSpec
 
 /**
  * @category model
@@ -60,7 +60,7 @@ export const scrape = <A>(scraper: Scraper<A>): ((tags: ReadonlyArray<T.Token>) 
 export const chroots = (selector: Selector) => <A>(
   scraper: Scraper<A>
 ): Scraper<ReadonlyArray<A>> =>
-  pipe(RO.asks(select(selector)), RO.map(flow(RA.map(scraper), RA.compact)))
+  pipe(RO.asks(S.select(selector)), RO.map(flow(RA.map(scraper), RA.compact)))
 
 /**
  * The `chroot` combinator takes a `Selector` and an inner `Scraper` and executes
@@ -85,7 +85,7 @@ export const chroot = (selector: Selector): (<A>(scraper: Scraper<A>) => Scraper
  */
 export const matches = (selector: Selector): Scraper<ReadonlyArray<TagSpec>> =>
   pipe(
-    RO.asks(select(selector)),
+    RO.asks(S.select(selector)),
     RO.chain<TagSpec, ReadonlyArray<TagSpec>, ReadonlyArray<TagSpec>>(
       RO.fromPredicate(not(RA.isEmpty))
     )
@@ -102,7 +102,7 @@ export const matches = (selector: Selector): Scraper<ReadonlyArray<TagSpec>> =>
  * @since 0.0.1
  */
 export const text = (selector: Selector): Scraper<string> =>
-  pipe(RO.asks(select(selector)), RO.chain(withFirst(tagsToText)))
+  pipe(RO.asks(S.select(selector)), RO.chain(withFirst(tagsToText)))
 
 /**
  * The `text` combinator takes a `Selector` and returns the inner text from
@@ -112,7 +112,7 @@ export const text = (selector: Selector): Scraper<string> =>
  * @since 0.0.1
  */
 export const texts = (selector: Selector): Scraper<ReadonlyArray<string>> =>
-  pipe(RO.asks(select(selector)), RO.chain(withAll(tagsToText)))
+  pipe(RO.asks(S.select(selector)), RO.chain(withAll(tagsToText)))
 
 /**
  * The `attr` combinator takes an attribute `key` and a `Selector` and
@@ -127,7 +127,7 @@ export const texts = (selector: Selector): Scraper<ReadonlyArray<string>> =>
  */
 export const attr = (key: string, selector: Selector): Scraper<string> =>
   pipe(
-    RO.asks(select(selector)),
+    RO.asks(S.select(selector)),
     RO.chainOptionK(flow(RA.map(tagsToAttr(key)), RA.compact, RA.head))
   )
 
@@ -140,7 +140,7 @@ export const attr = (key: string, selector: Selector): Scraper<string> =>
  * @since 0.0.1
  */
 export const attrs = (key: string, selector: Selector): Scraper<ReadonlyArray<string>> =>
-  pipe(RO.asks(select(selector)), RO.map(flow(RA.map(tagsToAttr(key)), RA.compact)))
+  pipe(RO.asks(S.select(selector)), RO.map(flow(RA.map(tagsToAttr(key)), RA.compact)))
 
 /**
  * The `html` combinator takes a `Selector` and returns the HTML string
@@ -153,7 +153,7 @@ export const attrs = (key: string, selector: Selector): Scraper<ReadonlyArray<st
  * @since 0.0.1
  */
 export const html = (selector: Selector): Scraper<string> =>
-  pipe(RO.asks(select(selector)), RO.chain(withFirst(tagsToHtml)))
+  pipe(RO.asks(S.select(selector)), RO.chain(withFirst(tagsToHtml)))
 
 /**
  * The `htmls` combinator takes a `Selector` and returns the HTML string
@@ -164,7 +164,7 @@ export const html = (selector: Selector): Scraper<string> =>
  * @since 0.0.1
  */
 export const htmls = (selector: Selector): Scraper<ReadonlyArray<string>> =>
-  pipe(RO.asks(select(selector)), RO.chain(withAll(tagsToHtml)))
+  pipe(RO.asks(S.select(selector)), RO.chain(withAll(tagsToHtml)))
 
 /**
  * The `innerHTML` combinator takes a `Selector` and returns the inner HTML
@@ -179,7 +179,7 @@ export const htmls = (selector: Selector): Scraper<ReadonlyArray<string>> =>
  * @since 0.0.1
  */
 export const innerHTML = (selector: Selector): Scraper<string> =>
-  pipe(RO.asks(select(selector)), RO.chain(withFirst(tagsToInnerHTML)))
+  pipe(RO.asks(S.select(selector)), RO.chain(withFirst(tagsToInnerHTML)))
 
 /**
  * The `innerHTMLs` combinator takes a `Selector` and returns the inner HTML
@@ -191,7 +191,7 @@ export const innerHTML = (selector: Selector): Scraper<string> =>
  * @since 0.0.1
  */
 export const innerHTMLs = (selector: Selector): Scraper<ReadonlyArray<string>> =>
-  pipe(RO.asks(select(selector)), RO.chain(withAll(tagsToInnerHTML)))
+  pipe(RO.asks(S.select(selector)), RO.chain(withAll(tagsToInnerHTML)))
 
 /**
  * The `position` combinator is designed to be used to extract the position

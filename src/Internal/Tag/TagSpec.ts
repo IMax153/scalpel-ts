@@ -1,15 +1,16 @@
+/**
+ * @since 0.0.1
+ */
 import type { SelectContext } from '../../Select'
-import * as T from '../Html/Tokenizer'
+import type { Token } from '../Html/Tokenizer'
+import type { TagForest } from './TagForest'
+import type { TagInfo } from './TagInfo'
 import * as F from './TagForest'
 import * as I from './TagInfo'
 
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
-
-import TagForest = F.TagForest
-import TagInfo = I.TagInfo
-import Token = T.Token
 
 /**
  * Represents a structure containing the parsed token information, the

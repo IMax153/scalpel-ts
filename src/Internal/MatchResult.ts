@@ -1,3 +1,6 @@
+/**
+ * @since 0.0.1
+ */
 import * as B from 'fp-ts/boolean'
 import { Semigroup } from 'fp-ts/Semigroup'
 import { absurd } from 'fp-ts/function'

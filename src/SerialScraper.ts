@@ -85,6 +85,7 @@
  *
  * @since 0.0.1
  */
+import type { Option } from 'fp-ts/Option'
 import * as A from 'fp-ts/Array'
 import * as O from 'fp-ts/Option'
 import * as RA from 'fp-ts/ReadonlyArray'
@@ -92,6 +93,7 @@ import * as RNEA from 'fp-ts/ReadonlyNonEmptyArray'
 import { flow, pipe } from 'fp-ts/function'
 import * as Z from 'fp-ts-contrib/Zipper'
 
+import type { StateOption } from './Internal/StateOption'
 import type { Scraper } from './Scraper'
 import * as SO from './Internal/StateOption'
 import { TagSpec } from './Internal/Tag/TagSpec'
@@ -101,9 +103,6 @@ export * from './Internal/StateOption'
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
-
-import Option = O.Option
-import StateOption = SO.StateOption
 
 /**
  * Serial scrapers operate on a zipper of `TagSpec`s that correspond to the root

@@ -10,6 +10,8 @@ import type { Either } from 'fp-ts/Either'
 import type { Filter2, Filterable2, Partition2 } from 'fp-ts/Filterable'
 import type { Functor2 } from 'fp-ts/Functor'
 import type { Monad2 } from 'fp-ts/Monad'
+import type { Option } from 'fp-ts/Option'
+import type { Reader } from 'fp-ts/Reader'
 import * as O from 'fp-ts/Option'
 import * as R from 'fp-ts/Reader'
 import { identity, flow, not, pipe, Lazy, Predicate, Refinement } from 'fp-ts/function'
@@ -17,9 +19,6 @@ import { identity, flow, not, pipe, Lazy, Predicate, Refinement } from 'fp-ts/fu
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
-
-import Option = O.Option
-import Reader = R.Reader
 
 /**
  * @category model

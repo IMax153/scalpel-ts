@@ -7,6 +7,7 @@ import type { Applicative2 } from 'fp-ts/Applicative'
 import type { Apply2 } from 'fp-ts/Apply'
 import type { Functor2 } from 'fp-ts/Functor'
 import type { Monad2 } from 'fp-ts/Monad'
+import type { Option } from 'fp-ts/Option'
 import * as O from 'fp-ts/Option'
 import * as S from 'fp-ts/State'
 import { flow, identity, pipe, Lazy } from 'fp-ts/function'
@@ -14,8 +15,6 @@ import { flow, identity, pipe, Lazy } from 'fp-ts/function'
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
-
-import Option = O.Option
 
 /**
  * @category model

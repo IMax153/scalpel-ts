@@ -1,3 +1,7 @@
+/**
+ * @since 0.0.1
+ */
+import type { Option } from 'fp-ts/Option'
 import * as Eq from 'fp-ts/Eq'
 import * as O from 'fp-ts/Option'
 import * as Ord from 'fp-ts/Ord'
@@ -5,14 +9,12 @@ import * as RA from 'fp-ts/ReadonlyArray'
 import * as RM from 'fp-ts/ReadonlyMap'
 import { flow, pipe, Endomorphism } from 'fp-ts/function'
 
+import type { Token } from '../Html/Tokenizer'
 import * as T from '../Html/Tokenizer'
 
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
-
-import Option = O.Option
-import Token = T.Token
 
 /**
  * Represents a token and its pre-computed metadata which can be accessed in tight

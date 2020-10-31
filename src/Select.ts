@@ -1,6 +1,8 @@
 /**
  * @since 0.0.1
  */
+import type { Option } from 'fp-ts/Option'
+import type { Tree } from 'fp-ts/Tree'
 import * as A from 'fp-ts/Array'
 import * as Eq from 'fp-ts/Eq'
 import * as M from 'fp-ts/Monoid'
@@ -9,9 +11,12 @@ import * as RA from 'fp-ts/ReadonlyArray'
 import * as Tr from 'fp-ts/Tree'
 import * as F from 'fp-ts/function'
 
+import type { Attribute } from './Internal/Html/Tokenizer'
+import type { TagForest, TagSpan } from './Internal/Tag/TagForest'
+import type { TagSpec } from './Internal/Tag/TagSpec'
+import type { TagInfo } from './Internal/Tag/TagInfo'
 import * as T from './Internal/Html/Tokenizer'
 import * as TF from './Internal/Tag/TagForest'
-import * as I from './Internal/Tag/TagInfo'
 import * as TS from './Internal/Tag/TagSpec'
 import * as MR from './Internal/MatchResult'
 
@@ -21,14 +26,6 @@ const foldAny = M.fold(M.monoidAny)
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
-
-import Attribute = T.Attribute
-import Option = O.Option
-import TagForest = TF.TagForest
-import TagInfo = I.TagInfo
-import TagSpan = TF.TagSpan
-import TagSpec = TS.TagSpec
-import Tree = Tr.Tree
 
 /**
  * Represents a selection of an HTML DOM tree to be operated upon by a web
@@ -428,7 +425,7 @@ const shrinkSpecWith = (spec: TagSpec, parent: Tree<TagSpan>): TagSpec => {
   )
 }
 const updateHierarchy = (curr: TagSpec, hierarchy: TagForest): TagSpec =>
-  TagSpec(curr.context, hierarchy, curr.tokens)
+  TS.TagSpec(curr.context, hierarchy, curr.tokens)
 
 const selectNodes = (selectors: Selector, curr: TagSpec, root: TagSpec) => (
   acc: ReadonlyArray<TagSpec>

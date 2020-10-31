@@ -8,15 +8,13 @@ import * as RA from 'fp-ts/ReadonlyArray'
 import * as Tree from 'fp-ts/Tree'
 import { pipe, Endomorphism, Predicate } from 'fp-ts/function'
 
-import * as I from './TagInfo'
+import type { Token } from '../Html/Tokenizer'
+import type { TagInfo } from './TagInfo'
 import * as T from '../Html/Tokenizer'
 
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
-
-import TagInfo = I.TagInfo
-import Token = T.Token
 
 /**
  * Represents the hierarchical structure of an HTML document. Nodes of the tree
