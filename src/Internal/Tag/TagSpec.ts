@@ -1,11 +1,15 @@
-import type { Token } from '../Html/Token'
-import type { SelectContext } from '../Select'
-import { fromTokenInfo, TagForest } from './TagForest'
-import { annotateTokens, TokenInfo } from './TokenInfo'
+import type { SelectContext } from '../../Select'
+import * as T from '../Html/Tokenizer'
+import * as F from './TagForest'
+import * as I from './TagInfo'
 
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
+
+import TagForest = F.TagForest
+import TagInfo = I.TagInfo
+import Token = T.Token
 
 /**
  * Represents a structure containing the parsed token information, the
@@ -17,7 +21,7 @@ import { annotateTokens, TokenInfo } from './TokenInfo'
 export interface TagSpec {
   readonly context: SelectContext
   readonly hierarchy: TagForest
-  readonly tokens: ReadonlyArray<TokenInfo>
+  readonly tokens: ReadonlyArray<TagInfo>
 }
 
 // -------------------------------------------------------------------------------------
@@ -31,7 +35,7 @@ export interface TagSpec {
 export const TagSpec = (
   context: SelectContext,
   hierarchy: TagForest,
-  tokens: ReadonlyArray<TokenInfo>
+  tokens: ReadonlyArray<TagInfo>
 ): TagSpec => ({
   context,
   hierarchy,
@@ -45,7 +49,7 @@ export const TagSpec = (
  * @since 0.0.1
  */
 export const tokensToSpec = (tokens: ReadonlyArray<Token>): TagSpec => {
-  const annotatedTokens = annotateTokens(tokens)
-  const hierarchy = fromTokenInfo(annotatedTokens)
+  const annotatedTokens = I.annotateTokens(tokens)
+  const hierarchy = F.fromTagInfo(annotatedTokens)
   return TagSpec({ position: 0, inChroot: false }, hierarchy, annotatedTokens)
 }

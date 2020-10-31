@@ -8,12 +8,15 @@ import * as RA from 'fp-ts/ReadonlyArray'
 import * as Tree from 'fp-ts/Tree'
 import { pipe, Endomorphism, Predicate } from 'fp-ts/function'
 
-import type { TokenInfo } from './TokenInfo'
-import * as T from '../Html/Token'
+import * as I from './TagInfo'
+import * as T from '../Html/Tokenizer'
 
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
+
+import TagInfo = I.TagInfo
+import Token = T.Token
 
 /**
  * Represents the hierarchical structure of an HTML document. Nodes of the tree
@@ -53,14 +56,11 @@ export const TagSpan = (start: number, end: number): TagSpan => ({
   end
 })
 
-const shouldSkip: Predicate<T.Token> = T.fold({
+const shouldSkip: Predicate<Token> = T.fold({
   TagOpen: () => false,
-  TagSelfClose: () => false,
   TagClose: () => true,
-  ContentText: () => false,
-  ContentChar: () => false,
-  Comment: () => true,
-  Doctype: () => false
+  Text: () => false,
+  Comment: () => true
 })
 
 /**
@@ -75,7 +75,7 @@ const shouldSkip: Predicate<T.Token> = T.fold({
  * @category constructors
  * @since 0.0.1
  */
-export const fromTokenInfo = (tokenInfo: ReadonlyArray<TokenInfo>): TagForest => {
+export const fromTagInfo = (tokenInfo: ReadonlyArray<TagInfo>): TagForest => {
   const forestWithin = (start: number, end: number): TagForest => {
     if (end <= start) return A.empty
     return pipe(

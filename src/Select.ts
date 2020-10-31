@@ -3,15 +3,14 @@ import * as Eq from 'fp-ts/Eq'
 import * as M from 'fp-ts/Monoid'
 import * as O from 'fp-ts/Option'
 import * as RA from 'fp-ts/ReadonlyArray'
-import * as Tree from 'fp-ts/Tree'
+import * as Tr from 'fp-ts/Tree'
 import * as F from 'fp-ts/function'
 
-import type { TokenInfo } from './Types/TokenInfo'
-import * as T from './Html/Token'
-import { matchKey, AttributeName } from './Types/AttributeName'
-import * as MR from './Types/MatchResult'
-import { TagForest, TagSpan } from './Types/TagForest'
-import { TagSpec } from './Types/TagSpec'
+import * as T from './Internal/Html/Tokenizer'
+import * as TF from './Internal/Tag/TagForest'
+import * as I from './Internal/Tag/TagInfo'
+import * as TS from './Internal/Tag/TagSpec'
+import * as MR from './Internal/MatchResult'
 
 const foldAll = M.fold(M.monoidAll)
 const foldAny = M.fold(M.monoidAny)
@@ -19,6 +18,14 @@ const foldAny = M.fold(M.monoidAny)
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
+
+import Attribute = T.Attribute
+import Option = O.Option
+import TagForest = TF.TagForest
+import TagInfo = I.TagInfo
+import TagSpan = TF.TagSpan
+import TagSpec = TS.TagSpec
+import Tree = Tr.Tree
 
 /**
  * Represents a selection of an HTML DOM tree to be operated upon by a web
@@ -233,7 +240,7 @@ export const foldStrategy = <R>(patterns: {
  * @since 0.0.1
  */
 export const tag = (name: string): Selector =>
-  F.pipe(Selection(SelectOne(name, RA.empty), defaultSelectSettings), RA.of)
+  RA.of(Selection(SelectOne(name, RA.empty), defaultSelectSettings))
 
 /**
  * The `any` combinator creates a `Selector` that will match any node (including
@@ -242,15 +249,15 @@ export const tag = (name: string): Selector =>
  * @category constructors
  * @since 0.0.1
  */
-export const any: Selector = F.pipe(Selection(SelectAny(RA.empty), defaultSelectSettings), RA.of)
+export const any: Selector = RA.of(Selection(SelectAny(RA.empty), defaultSelectSettings))
 
 /**
- * The `text` combinator creates a `Selector` that will match all text node
+ * The `text` combinator creates a `Selector` that will match all text nodes.
  *
  * @category constructors
  * @since 0.0.1
  */
-export const text: Selector = F.pipe(Selection(SelectText, defaultSelectSettings), RA.of)
+export const text: Selector = RA.of(Selection(SelectText, defaultSelectSettings))
 
 /**
  * The `withAttributes` combinator creates a `Selector` by combining a tag name
@@ -264,7 +271,7 @@ export const text: Selector = F.pipe(Selection(SelectText, defaultSelectSettings
 export const withAttributes = (
   name: string,
   predicates: ReadonlyArray<AttributePredicate>
-): Selector => F.pipe(Selection(SelectOne(name, predicates), defaultSelectSettings), RA.of)
+): Selector => RA.of(Selection(SelectOne(name, predicates), defaultSelectSettings))
 
 /**
  * The `anyWithAttributes` combinator creates a `Selector` that takes a list of
@@ -275,7 +282,13 @@ export const withAttributes = (
  * @since 0.0.1
  */
 export const anyWithAttributes = (predicates: ReadonlyArray<AttributePredicate>): Selector =>
-  F.pipe(Selection(SelectAny(predicates), defaultSelectSettings), RA.of)
+  RA.of(Selection(SelectAny(predicates), defaultSelectSettings))
+
+const matchAttrKey: (attribute: Attribute, key: Option<string>) => boolean = (attr, key) =>
+  F.pipe(
+    key,
+    O.fold(F.constTrue, (name) => name.toLowerCase() === attr.key.toLowerCase())
+  )
 
 /**
  * The `attribute` combinator creates an `AttributePredicate` that will match
@@ -287,9 +300,9 @@ export const anyWithAttributes = (predicates: ReadonlyArray<AttributePredicate>)
  * @category combinators
  * @since 0.0.1
  */
-export const attribute = (key: AttributeName, value: string): AttributePredicate =>
+export const attribute = (key: Option<string>, value: string): AttributePredicate =>
   F.flow(
-    RA.map((attr) => foldAll([matchKey(key)(attr.key), attr.value === value])),
+    RA.map((attr) => foldAll([matchAttrKey(attr, key), attr.value === value])),
     foldAny
   )
 
@@ -301,9 +314,9 @@ export const attribute = (key: AttributeName, value: string): AttributePredicate
  * @category combinators
  * @since 0.0.1
  */
-export const attributeRegex = (key: AttributeName, regex: RegExp): AttributePredicate =>
+export const attributeRegex = (key: Option<string>, regex: RegExp): AttributePredicate =>
   F.flow(
-    RA.map((attr) => foldAll([matchKey(key)(attr.key), regex.test(attr.value)])),
+    RA.map((attr) => foldAll([matchAttrKey(attr, key), regex.test(attr.value)])),
     foldAny
   )
 
@@ -397,17 +410,17 @@ export const select = (selector: Selector) => (spec: TagSpec): ReadonlyArray<Tag
   F.pipe(
     RA.empty,
     selectNodes(selector, spec, spec),
-    RA.mapWithIndex((p, s) => TagSpec(SelectContext(p, true), s.hierarchy, s.tokens))
+    RA.mapWithIndex((p, s) => TS.TagSpec(SelectContext(p, true), s.hierarchy, s.tokens))
   )
 
 const recenter = (parent: TagSpan) => (child: TagSpan): TagSpan =>
-  TagSpan(child.start - parent.start, child.end - parent.start)
+  TF.TagSpan(child.start - parent.start, child.end - parent.start)
 
-const shrinkSpecWith = (spec: TagSpec, parent: Tree.Tree<TagSpan>): TagSpec => {
+const shrinkSpecWith = (spec: TagSpec, parent: Tree<TagSpan>): TagSpec => {
   const { start, end } = parent.value
-  return TagSpec(
+  return TS.TagSpec(
     spec.context,
-    F.pipe(parent, Tree.map(recenter(parent.value)), A.of),
+    F.pipe(parent, Tr.map(recenter(parent.value)), A.of),
     spec.tokens.slice(start, end + 1)
   )
 }
@@ -532,12 +545,9 @@ const checkPredicates = (
           token,
           T.fold({
             TagOpen: F.constTrue,
-            TagSelfClose: F.constTrue,
             TagClose: F.constFalse,
-            ContentText: F.constTrue,
-            ContentChar: F.constTrue,
-            Comment: F.constFalse,
-            Doctype: F.constFalse
+            Text: F.constTrue,
+            Comment: F.constFalse
           }),
           MR.fromBoolean
         ),
@@ -551,17 +561,9 @@ const checkPredicates = (
                 RA.map((p) => p(attrs)),
                 foldAll
               ),
-            TagSelfClose: (_, attrs) =>
-              F.pipe(
-                RA.cons(x, xs),
-                RA.map((p) => p(attrs)),
-                foldAll
-              ),
             TagClose: F.constFalse,
-            ContentText: F.constFalse,
-            ContentChar: F.constFalse,
-            Comment: F.constFalse,
-            Doctype: F.constFalse
+            Text: F.constFalse,
+            Comment: F.constFalse
           }),
           MR.fromBoolean
         )
@@ -573,19 +575,16 @@ const eqOptionName = O.getEq<string>(Eq.eqString)
 const checkToken = (
   name: string,
   predicates: ReadonlyArray<AttributePredicate>,
-  info: TokenInfo
+  info: TagInfo
 ): MR.MatchResult => {
   const x = checkPredicates(info.token, predicates)
   const y = F.pipe(
     info.token,
     T.fold({
       TagOpen: () => eqOptionName.equals(O.some(name), info.name),
-      TagSelfClose: () => eqOptionName.equals(O.some(name), info.name),
       TagClose: F.constFalse,
-      ContentText: F.constFalse,
-      ContentChar: F.constFalse,
-      Comment: F.constFalse,
-      Doctype: () => eqOptionName.equals(O.some(name), info.name)
+      Text: F.constFalse,
+      Comment: F.constFalse
     }),
     MR.fromBoolean
   )
@@ -608,15 +607,21 @@ const checkSettings = (settings: SelectSettings, current: TagSpec, root: TagSpec
           RA.foldLeft(
             () => MR.MatchOk,
             (currentRoot) => {
-              const { start, end } = currentRoot.value
+              const monoidPredicate: M.Monoid<(s: TagSpan) => boolean> = M.getFunctionMonoid(
+                M.monoidAll
+              )<TagSpan>()
+
+              const isChildOf = (s: TagSpan): boolean => s.start < currentRoot.value.start
+              const exceedsDepth = (s: TagSpan): boolean => currentRoot.value.end < s.end
+              const containsCurrent = monoidPredicate.concat(isChildOf, exceedsDepth)
+
               const currentDepth = F.pipe(
                 root.hierarchy,
                 RA.foldMap(M.monoidSum)(
-                  Tree.foldMap(M.monoidSum)((span) =>
-                    span.start < start && end < span.end ? 1 : 0
-                  )
+                  Tr.foldMap(M.monoidSum)((s) => (containsCurrent(s) ? 1 : 0))
                 )
               )
+
               return currentDepth < depth
                 ? MR.MatchFail
                 : currentDepth > depth
@@ -630,7 +635,7 @@ const checkSettings = (settings: SelectSettings, current: TagSpec, root: TagSpec
 
 const nodeMatches = (
   selection: Selection,
-  info: TokenInfo,
+  info: TagInfo,
   curr: TagSpec,
   root: TagSpec
 ): MR.MatchResult =>
@@ -654,12 +659,9 @@ const nodeMatches = (
             info.token,
             T.fold({
               TagOpen: F.constFalse,
-              TagSelfClose: F.constFalse,
               TagClose: F.constFalse,
-              ContentText: F.constTrue,
-              ContentChar: F.constTrue,
-              Comment: F.constFalse,
-              Doctype: F.constFalse
+              Text: F.constTrue,
+              Comment: F.constFalse
             }),
             MR.fromBoolean
           )

@@ -2,11 +2,10 @@ import * as C from 'fp-ts/Console'
 import * as IO from 'fp-ts/IO'
 import * as IOE from 'fp-ts/IOEither'
 import { pipe } from 'fp-ts/function'
-import { run } from 'parser-ts/code-frame'
 
 import * as Select from '../src/Select'
 import * as Scraper from '../src/Scraper'
-import { parse } from '../src/Html/Parser'
+import { parse } from '../src/Internal/Html/Tokenizer'
 
 const exampleHTML = `
 <html>
@@ -48,7 +47,7 @@ const imageAttributes: Scraper.Scraper<ReadonlyArray<ImageAttributes>> = pipe(
 )
 
 const main: IO.IO<void> = pipe(
-  run(parse, exampleHTML),
+  parse(exampleHTML),
   IOE.fromEither,
   IOE.mapLeft(() => 'Unable to parse HTML'),
   IOE.chain((tokens) =>

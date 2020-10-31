@@ -13,19 +13,23 @@ import * as R from 'fp-ts/Reader'
 import * as RA from 'fp-ts/ReadonlyArray'
 import { flow, identity, not, pipe, Lazy, Predicate, Refinement } from 'fp-ts/function'
 
-import * as T from './Html/Token'
+import * as T from './Internal/Html/Tokenizer'
+import * as TS from './Internal/Tag/TagSpec'
 import { select, Selector } from './Select'
-import { tokensToSpec, TagSpec } from './Types/TagSpec'
 
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
 
+import Option = O.Option
+import Attribute = T.Attribute
+import TagSpec = TS.TagSpec
+
 /**
  * @category model
  * @since 0.0.1
  */
-export type Scraper<A> = R.Reader<TagSpec, O.Option<A>>
+export type Scraper<A> = R.Reader<TagSpec, Option<A>>
 
 // -------------------------------------------------------------------------------------
 // constructors
@@ -63,7 +67,7 @@ export const asks: <A>(f: (r: TagSpec) => A) => Scraper<A> = (f) => flow(f, O.so
  * @category constructors
  * @since 0.0.1
  */
-export const fromOption: <A>(ma: O.Option<A>) => Scraper<A> =
+export const fromOption: <A>(ma: Option<A>) => Scraper<A> =
   /* #__PURE__ */
   R.of
 
@@ -122,8 +126,8 @@ export const getOrElse: <A>(
  * @category utils
  * @since 0.0.1
  */
-export const scrape = <A>(scraper: Scraper<A>): ((tags: ReadonlyArray<T.Token>) => O.Option<A>) =>
-  flow(T.canonicalizeTokens, tokensToSpec, scrapeTagSpec(scraper))
+export const scrape = <A>(scraper: Scraper<A>): ((tags: ReadonlyArray<T.Token>) => Option<A>) =>
+  flow(TS.tokensToSpec, scrapeTagSpec(scraper))
 
 // -------------------------------------------------------------------------------------
 // combinators
@@ -348,7 +352,7 @@ export const map: <A, B>(f: (a: A) => B) => (fa: Scraper<A>) => Scraper<B> = (f)
  */
 export const ap = <A>(fa: Scraper<A>): (<B>(fab: Scraper<(a: A) => B>) => Scraper<B>) =>
   flow(
-    R.map((gab) => (ga: O.Option<A>) => O.ap(ga)(gab)),
+    R.map((gab) => (ga: Option<A>) => O.ap(ga)(gab)),
     R.ap(fa)
   )
 
@@ -422,7 +426,7 @@ export const zero: Alternative1<URI>['zero'] = () => none
  * @category Compactable
  * @since 0.0.1
  */
-export const compact: <A>(fa: Scraper<O.Option<A>>) => Scraper<A> = R.map(O.compact)
+export const compact: <A>(fa: Scraper<Option<A>>) => Scraper<A> = R.map(O.compact)
 
 /**
  * @category Compactable
@@ -448,9 +452,9 @@ export const filter: {
  * @category Filterable
  * @since 0.0.1
  */
-export const filterMap: <A, B>(f: (a: A) => O.Option<B>) => (fa: Scraper<A>) => Scraper<B> = (
-  f
-) => (fa) => pipe(fa, R.map(O.filterMap(f)))
+export const filterMap: <A, B>(f: (a: A) => Option<B>) => (fa: Scraper<A>) => Scraper<B> = (f) => (
+  fa
+) => pipe(fa, R.map(O.filterMap(f)))
 
 export const partition: {
   <A, B extends A>(refinement: Refinement<A, B>): (
@@ -617,8 +621,7 @@ export const bind = <N extends string, A, B>(
 /**
  * A convenience method to "run" the `Scraper`.
  */
-const scrapeTagSpec = <A>(scraper: Scraper<A>) => (tagSpec: TagSpec): O.Option<A> =>
-  scraper(tagSpec)
+const scrapeTagSpec = <A>(scraper: Scraper<A>) => (tagSpec: TagSpec): Option<A> => scraper(tagSpec)
 
 /**
  * Takes a function which maps over the results of a `Selection` and returns the
@@ -651,12 +654,9 @@ const foldSpec = <B>(M: M.Monoid<B>) => (f: (a: T.Token) => B) => (spec: TagSpec
 const tagsToText: (spec: TagSpec) => string = foldSpec(M.monoidString)(
   T.fold({
     TagOpen: () => M.monoidString.empty,
-    TagSelfClose: () => M.monoidString.empty,
     TagClose: () => M.monoidString.empty,
-    ContentText: (text) => text,
-    ContentChar: (char) => char,
-    Comment: () => M.monoidString.empty,
-    Doctype: () => M.monoidString.empty
+    Text: identity,
+    Comment: () => M.monoidString.empty
   })
 )
 
@@ -664,9 +664,7 @@ const tagsToText: (spec: TagSpec) => string = foldSpec(M.monoidString)(
  * Returns the value of the first attribute matching the specified `key`,
  * if present.
  */
-const getAttribute = (
-  key: string
-): ((attributes: ReadonlyArray<T.Attribute>) => O.Option<string>) =>
+const getAttribute = (key: string): ((attributes: ReadonlyArray<Attribute>) => Option<string>) =>
   flow(
     RA.filterMap((attr) => (attr.key === key ? O.some(attr.value) : O.none)),
     RA.head
@@ -676,16 +674,13 @@ const getAttribute = (
  * Maps over the tokens in a `TagSpec` returning the value of the first attribute
  * that matches the specified `key` on each token, if present.
  */
-const tagsToAttr = (key: string): ((spec: TagSpec) => O.Option<string>) =>
+const tagsToAttr = (key: string): ((spec: TagSpec) => Option<string>) =>
   foldSpec(O.getMonoid(M.monoidString))(
     T.fold({
       TagOpen: (_, attrs) => pipe(attrs, getAttribute(key)),
-      TagSelfClose: (_, attrs) => pipe(attrs, getAttribute(key)),
       TagClose: () => O.none,
-      ContentText: () => O.none,
-      ContentChar: () => O.none,
-      Comment: () => O.none,
-      Doctype: () => O.none
+      Text: () => O.none,
+      Comment: () => O.none
     })
   )
 

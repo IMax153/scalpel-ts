@@ -5,12 +5,11 @@ import * as M from 'fp-ts/Monoid'
 import * as O from 'fp-ts/Option'
 import * as RA from 'fp-ts/ReadonlyArray'
 import { absurd, flow, pipe, Endomorphism } from 'fp-ts/lib/function'
-import { run } from 'parser-ts/code-frame'
 
 import * as Scraper from '../src/Scraper'
 import * as Select from '../src/Select'
-import * as Serial from '../src/Serial'
-import { parse } from '../src/Html/Parser'
+import * as Serial from '../src/SerialScraper'
+import { parse } from '../src/Internal/Html/Tokenizer'
 
 // -------------------------------------------------------------------------------------
 // model
@@ -410,7 +409,7 @@ const exampleHTML = `
 `
 
 const main: IO.IO<void> = pipe(
-  run(parse, exampleHTML),
+  parse(exampleHTML),
   IOE.fromEither,
   IOE.mapLeft(() => 'Unable to parse the HTML'),
   IOE.chain((tokens) =>
