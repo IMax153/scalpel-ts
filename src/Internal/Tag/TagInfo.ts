@@ -7,7 +7,7 @@ import * as O from 'fp-ts/Option'
 import * as Ord from 'fp-ts/Ord'
 import * as RA from 'fp-ts/ReadonlyArray'
 import * as RM from 'fp-ts/ReadonlyMap'
-import { flow, pipe, Endomorphism } from 'fp-ts/function'
+import { constant, flow, pipe, Endomorphism } from 'fp-ts/function'
 
 import type { Token } from '../Html/Tokenizer'
 import * as T from '../Html/Tokenizer'
@@ -24,15 +24,15 @@ import * as T from '../Html/Tokenizer'
  * @since 0.0.1
  */
 export interface TagInfo {
-  /**
-   * The name of the parsed token, if present. Tokens that have associated names
-   * include:
-   * - `TagOpen`
-   * - `TagSelfClose`
-   * - `TagClose`
-   * - `Doctype`
-   */
-  readonly name: Option<string>
+  // /**
+  //  * The name of the parsed token, if present. Tokens that have associated names
+  //  * include:
+  //  * - `TagOpen`
+  //  * - `TagSelfClose`
+  //  * - `TagClose`
+  //  * - `Doctype`
+  //  */
+  // readonly name: Option<string>
   /**
    * The parsed token.
    */
@@ -52,12 +52,7 @@ export interface TagInfo {
  * @category constructors
  * @since 0.0.1
  */
-export const TagInfo = (
-  name: Option<string>,
-  token: Token,
-  closeOffset: Option<number>
-): TagInfo => ({
-  name,
+export const TagInfo = (token: Token, closeOffset: Option<number>): TagInfo => ({
   token,
   closeOffset
 })
@@ -69,15 +64,23 @@ interface IndexedToken {
 
 interface IndexedTagInfo {
   readonly index: number
-  readonly tokenInfo: TagInfo
+  readonly info: TagInfo
 }
 
-const tokenName: (token: Token) => Option<string> = T.fold({
-  TagOpen: (name) => O.some(name),
-  TagClose: (name) => O.some(name),
-  Text: () => O.none,
-  Comment: () => O.none
+const IndexedToken = (index: number, token: Token): IndexedToken => ({
+  index,
+  token
 })
+
+const IndexedTagInfo = (index: number, info: TagInfo): IndexedTagInfo => ({
+  index,
+  info
+})
+
+const ordIndexedTagInfo: Ord.Ord<IndexedTagInfo> = pipe(
+  Ord.ordNumber,
+  Ord.contramap(({ index }) => index)
+)
 
 /**
  * Alters a value `V` at the key `K`, or absence thereof. Can be used to insert, delete,
@@ -105,27 +108,31 @@ const alterMap = <K>(E: Eq.Eq<K>) => <V>(key: K, f: Endomorphism<Option<V>>) => 
     )
   )
 
-const appendToken = (token: IndexedToken): Endomorphism<Option<ReadonlyArray<IndexedToken>>> =>
-  O.fold(
-    () => O.some(RA.of(token)),
-    (xs) => pipe(xs, RA.cons(token), O.some)
-  )
+const appendToken = (x: IndexedToken): Endomorphism<Option<ReadonlyArray<IndexedToken>>> =>
+  O.fold(() => pipe(RA.of(x), O.some), flow(RA.cons(x), O.some))
 
 const popToken: Endomorphism<Option<ReadonlyArray<IndexedToken>>> = O.fold(
-  () => O.none,
-  (xs) => RA.tail(xs)
+  constant(O.none),
+  RA.tail
 )
 
 const calculateOffset = (start: IndexedToken) => (end: IndexedToken): IndexedTagInfo => {
-  const info = TagInfo(tokenName(start.token), end.token, O.some(start.index - end.index))
-  return { index: end.index, tokenInfo: info }
+  const info = TagInfo(end.token, O.some(start.index - end.index))
+  return IndexedTagInfo(end.index, info)
 }
 
-const ordIndexedTagInfo: Ord.Ord<IndexedTagInfo> = pipe(
-  Ord.ordNumber,
-  Ord.contramap(({ index }) => index)
-)
+const appendToStack = (
+  index: number,
+  token: T.TagOpen,
+  stack: ReadonlyMap<string, ReadonlyArray<IndexedToken>>
+): ReadonlyMap<string, ReadonlyArray<IndexedToken>> =>
+  pipe(stack, alterMap(Eq.eqString)(token.name, appendToken(IndexedToken(index, token))))
 
+const removeFromStack = (
+  token: T.TagClose,
+  stack: ReadonlyMap<string, ReadonlyArray<IndexedToken>>
+): ReadonlyMap<string, ReadonlyArray<IndexedToken>> =>
+  pipe(stack, alterMap(Eq.eqString)(token.name, popToken))
 /**
  * Annotates each parsed token with the name of its associated HTML tag, if present,
  * and the offset to its closing tag, if present.
@@ -156,74 +163,52 @@ const ordIndexedTagInfo: Ord.Ord<IndexedTagInfo> = pipe(
  * @category constructors
  * @since 0.0.1
  */
-export const annotateTokens: (tokens: ReadonlyArray<Token>) => ReadonlyArray<TagInfo> = (
-  tokens
-) => {
-  const go = (indexedTokens: ReadonlyArray<IndexedToken>) => (
-    tokenMap: ReadonlyMap<string, ReadonlyArray<IndexedToken>>
-  ): ReadonlyArray<IndexedTagInfo> =>
-    pipe(
-      indexedTokens,
-      RA.foldLeft(
-        () =>
-          // At this point there are no more tokens in the stream to process, so all
-          // remaining tags are added to the result set without a closing offset
-          pipe(
-            tokenMap,
-            RM.collect(Ord.ordString)((_, v) => v),
-            RA.flatten,
-            RA.map(({ index, token }) => ({
-              index,
-              tokenInfo: TagInfo(tokenName(token), token, O.none)
-            }))
-          ),
-        (x, xs) =>
-          pipe(
-            x.token,
-            T.fold({
-              TagOpen: (name) =>
-                pipe(tokenMap, alterMap(Eq.eqString)(name, appendToken(x)), go(xs)),
-              TagClose: (name) =>
-                pipe(
-                  tokenMap,
-                  RM.lookup(Eq.eqString)(name),
-                  O.chain(RA.head),
-                  O.traverse(RA.Applicative)(flow(calculateOffset(x), RA.of)),
-                  RA.cons(
-                    O.some({ index: x.index, tokenInfo: TagInfo(O.some(name), x.token, O.none) })
-                  ),
-                  RA.compact,
-                  (ys) =>
-                    RA.getMonoid<IndexedTagInfo>().concat(
-                      ys,
-                      pipe(tokenMap, alterMap(Eq.eqString)(name, popToken), go(xs))
-                    )
-                ),
-              Text: () =>
-                pipe(
-                  tokenMap,
-                  go(xs),
-                  RA.cons({ index: x.index, tokenInfo: TagInfo(O.none, x.token, O.none) })
-                ),
-              Comment: () =>
-                pipe(
-                  tokenMap,
-                  go(xs),
-                  RA.cons({ index: x.index, tokenInfo: TagInfo(O.none, x.token, O.none) })
-                )
-            })
-          )
-      )
-    )
+export const annotateTokens = (tokens: ReadonlyArray<Token>): ReadonlyArray<TagInfo> => {
+  const M = RA.getMonoid<IndexedTagInfo>()
+
+  let results: ReadonlyArray<IndexedTagInfo> = RA.empty
+  let stack: ReadonlyMap<string, ReadonlyArray<IndexedToken>> = RM.empty
+
+  // To improve stack safety, we use an iterative approach
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i]
+
+    switch (token._tag) {
+      case 'TagOpen': {
+        // Add opening tag to the stack
+        stack = appendToStack(i, token, stack)
+        break
+      }
+
+      case 'TagClose': {
+        // Calculate the offset between opening and closing tags
+        const tags = pipe(
+          stack,
+          RM.lookup(Eq.eqString)(token.name),
+          O.chain(RA.head),
+          O.traverse(RA.Applicative)(flow(calculateOffset(IndexedToken(i, token)), RA.of)),
+          RA.compact,
+          RA.cons(IndexedTagInfo(i, TagInfo(token, O.none)))
+        )
+        // Add both to result set
+        results = M.concat(tags, results)
+        // Pop tag off the stack
+        stack = removeFromStack(token, stack)
+        break
+      }
+
+      default: {
+        // Add all other tokens to result set immediately
+        const info = TagInfo(token, O.none)
+        results = RA.cons(IndexedTagInfo(i, info), results)
+        break
+      }
+    }
+  }
+
   return pipe(
-    RM.empty,
-    go(
-      pipe(
-        tokens,
-        RA.mapWithIndex((index, token) => ({ index, token }))
-      )
-    ),
+    results,
     RA.sort(ordIndexedTagInfo),
-    RA.map(({ tokenInfo }) => tokenInfo)
+    RA.map(({ info }) => info)
   )
 }

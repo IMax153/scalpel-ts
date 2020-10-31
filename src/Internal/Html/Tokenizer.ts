@@ -204,22 +204,22 @@ export const parse = (source: string): Either<string, ReadonlyArray<Token>> => {
       )
       const token = TagOpen(name, attributes)
 
-      tokens.push(token)
+      tokens.unshift(token)
     },
     onclosetag: (name) => {
       const token = TagClose(name)
 
-      tokens.push(token)
+      tokens.unshift(token)
     },
     ontext: (text) => {
       const token = Text(text)
 
-      tokens.push(token)
+      tokens.unshift(token)
     },
     oncomment: (comment) => {
       const token = Comment(comment)
 
-      tokens.push(token)
+      tokens.unshift(token)
     },
     onerror: (err) => {
       error = O.some(err.message)

@@ -570,10 +570,8 @@ const checkPredicates = (
     )
   )
 
-const eqOptionName = O.getEq<string>(Eq.eqString)
-
-const checkToken = (
-  name: string,
+const checkTag = (
+  tagName: string,
   predicates: ReadonlyArray<AttributePredicate>,
   info: TagInfo
 ): MR.MatchResult => {
@@ -581,7 +579,7 @@ const checkToken = (
   const y = F.pipe(
     info.token,
     T.fold({
-      TagOpen: () => eqOptionName.equals(O.some(name), info.name),
+      TagOpen: (name) => Eq.eqString.equals(tagName, name),
       TagClose: F.constFalse,
       Text: F.constFalse,
       Comment: F.constFalse
@@ -645,7 +643,7 @@ const nodeMatches = (
       SelectOne: (tag, preds) =>
         MR.semigroupMatchResult.concat(
           checkSettings(selection.settings, curr, root),
-          checkToken(tag, preds, info)
+          checkTag(tag, preds, info)
         ),
       SelectAny: (preds) =>
         MR.semigroupMatchResult.concat(
