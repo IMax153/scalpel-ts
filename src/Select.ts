@@ -1,3 +1,6 @@
+/**
+ * @since 0.0.1
+ */
 import * as A from 'fp-ts/Array'
 import * as Eq from 'fp-ts/Eq'
 import * as M from 'fp-ts/Monoid'

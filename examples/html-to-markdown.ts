@@ -6,7 +6,7 @@ import * as O from 'fp-ts/Option'
 import * as RA from 'fp-ts/ReadonlyArray'
 import { absurd, flow, pipe, Endomorphism } from 'fp-ts/lib/function'
 
-import * as Scraper from '../src/Scraper'
+import * as S from '../src/Scraper'
 import * as Select from '../src/Select'
 import * as Serial from '../src/SerialScraper'
 import { parse } from '../src/Internal/Html/Tokenizer'
@@ -14,6 +14,9 @@ import { parse } from '../src/Internal/Html/Tokenizer'
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
+
+import Scraper = S.Scraper
+import Selector = Select.Selector
 
 type Markdown = string
 
@@ -251,122 +254,92 @@ const printMd: (text: FormattedText) => string = flow(textToMarkdown, cleanupMd)
 // scrapers
 // -------------------------------------------------------------------------------------
 
-const recurseOn = (selector: Select.Selector): Scraper.Scraper<ReadonlyArray<FormattedText>> =>
-  pipe(formattedTexts, Scraper.chroot(pipe(selector, Select.atDepth(0))))
+const recurseOn = (selector: Selector): Scraper<ReadonlyArray<FormattedText>> =>
+  pipe(formattedTexts, S.chroot(pipe(selector, Select.atDepth(0))))
 
-const formattedTexts: Scraper.Scraper<ReadonlyArray<FormattedText>> = (spec) => {
-  const italic: Scraper.Scraper<FormattedText> = pipe(
-    recurseOn(Select.tag('em')),
-    Scraper.map(Italic)
+const formattedTexts: Scraper<ReadonlyArray<FormattedText>> = (spec) => {
+  const italic: Scraper<FormattedText> = pipe(recurseOn(Select.tag('em')), S.map(Italic))
+
+  const bold: Scraper<FormattedText> = pipe(recurseOn(Select.tag('b')), S.map(Bold))
+
+  const header: Scraper<FormattedText> = pipe(recurseOn(Select.tag('header')), S.map(Paragraph))
+
+  const paragraph: Scraper<FormattedText> = pipe(recurseOn(Select.tag('p')), S.map(Paragraph))
+
+  const plainText: Scraper<FormattedText> = pipe(
+    S.text(pipe(Select.text, Select.atDepth(0))),
+    S.map(PlainText)
   )
 
-  const bold: Scraper.Scraper<FormattedText> = pipe(recurseOn(Select.tag('b')), Scraper.map(Bold))
-
-  const header: Scraper.Scraper<FormattedText> = pipe(
-    recurseOn(Select.tag('header')),
-    Scraper.map(Paragraph)
+  const newline: Scraper<FormattedText> = pipe(
+    S.matches(pipe(Select.tag('br'), Select.atDepth(0))),
+    S.map(() => Newline)
   )
 
-  const paragraph: Scraper.Scraper<FormattedText> = pipe(
-    recurseOn(Select.tag('p')),
-    Scraper.map(Paragraph)
-  )
-
-  const plainText: Scraper.Scraper<FormattedText> = pipe(
-    Scraper.text(pipe(Select.text, Select.atDepth(0))),
-    Scraper.map(PlainText)
-  )
-
-  const newline: Scraper.Scraper<FormattedText> = pipe(
-    Scraper.matches(pipe(Select.tag('br'), Select.atDepth(0))),
-    Scraper.map(() => Newline)
-  )
-
-  const formatting: Scraper.Scraper<FormattedText> = pipe(
+  const formatting: Scraper<FormattedText> = pipe(
     newline,
-    Scraper.alt(() => paragraph),
-    Scraper.alt(() => bold),
-    Scraper.alt(() => italic),
-    Scraper.alt(() => header),
-    Scraper.alt(() => plainText)
+    S.alt(() => paragraph),
+    S.alt(() => bold),
+    S.alt(() => italic),
+    S.alt(() => header),
+    S.alt(() => plainText)
   )
 
-  const h1: Scraper.Scraper<FormattedText> = pipe(
-    recurseOn(Select.tag('h1')),
-    Scraper.map(Header(1))
-  )
-  const h2: Scraper.Scraper<FormattedText> = pipe(
-    recurseOn(Select.tag('h2')),
-    Scraper.map(Header(2))
-  )
-  const h3: Scraper.Scraper<FormattedText> = pipe(
-    recurseOn(Select.tag('h3')),
-    Scraper.map(Header(3))
-  )
-  const h4: Scraper.Scraper<FormattedText> = pipe(
-    recurseOn(Select.tag('h4')),
-    Scraper.map(Header(4))
-  )
-  const h5: Scraper.Scraper<FormattedText> = pipe(
-    recurseOn(Select.tag('h5')),
-    Scraper.map(Header(5))
-  )
-  const h6: Scraper.Scraper<FormattedText> = pipe(
-    recurseOn(Select.tag('h6')),
-    Scraper.map(Header(6))
-  )
-  const headers: Scraper.Scraper<FormattedText> = pipe(
+  const h1: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h1')), S.map(Header(1)))
+  const h2: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h2')), S.map(Header(2)))
+  const h3: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h3')), S.map(Header(3)))
+  const h4: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h4')), S.map(Header(4)))
+  const h5: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h5')), S.map(Header(5)))
+  const h6: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h6')), S.map(Header(6)))
+  const headers: Scraper<FormattedText> = pipe(
     h1,
-    Scraper.alt(() => h2),
-    Scraper.alt(() => h3),
-    Scraper.alt(() => h4),
-    Scraper.alt(() => h5),
-    Scraper.alt(() => h6)
+    S.alt(() => h2),
+    S.alt(() => h3),
+    S.alt(() => h4),
+    S.alt(() => h5),
+    S.alt(() => h6)
   )
 
-  const unknown: Scraper.Scraper<FormattedText> = pipe(
-    recurseOn(Select.any),
-    Scraper.map(PlainTexts)
-  )
+  const unknown: Scraper<FormattedText> = pipe(recurseOn(Select.any), S.map(PlainTexts))
 
-  const nav: Scraper.Scraper<FormattedText> = pipe(
+  const nav: Scraper<FormattedText> = pipe(
     recurseOn(Select.tag('nav')),
-    Scraper.map(() => PlainTexts(RA.empty))
+    S.map(() => PlainTexts(RA.empty))
   )
 
-  const noscript: Scraper.Scraper<FormattedText> = pipe(
+  const noscript: Scraper<FormattedText> = pipe(
     recurseOn(Select.tag('noscript')),
-    Scraper.map(() => PlainTexts(RA.empty))
+    S.map(() => PlainTexts(RA.empty))
   )
 
-  const script: Scraper.Scraper<FormattedText> = pipe(
+  const script: Scraper<FormattedText> = pipe(
     recurseOn(Select.tag('script')),
-    Scraper.map(() => PlainTexts(RA.empty))
+    S.map(() => PlainTexts(RA.empty))
   )
 
-  const skip: Scraper.Scraper<FormattedText> = pipe(
+  const skip: Scraper<FormattedText> = pipe(
     nav,
-    Scraper.alt(() => noscript),
-    Scraper.alt(() => script)
+    S.alt(() => noscript),
+    S.alt(() => script)
   )
 
-  const link: Scraper.Scraper<FormattedText> = pipe(
-    Scraper.attr('href', Select.any),
-    Scraper.bindTo('href'),
-    Scraper.bind('texts', () => formattedTexts),
-    Scraper.map(({ href, texts }) => Link(href, texts)),
-    Scraper.chroot(pipe(Select.tag('a'), Select.atDepth(0)))
+  const link: Scraper<FormattedText> = pipe(
+    S.attr('href', Select.any),
+    S.bindTo('href'),
+    S.bind('texts', () => formattedTexts),
+    S.map(({ href, texts }) => Link(href, texts)),
+    S.chroot(pipe(Select.tag('a'), Select.atDepth(0)))
   )
 
-  const innerScraper: Scraper.Scraper<FormattedText> = pipe(
+  const innerScraper: Scraper<FormattedText> = pipe(
     formatting,
-    Scraper.alt(() => link),
-    Scraper.alt(() => headers),
-    Scraper.alt(() => skip),
-    Scraper.alt(() => unknown)
+    S.alt(() => link),
+    S.alt(() => headers),
+    S.alt(() => skip),
+    S.alt(() => unknown)
   )
 
-  const scraper: Scraper.Scraper<ReadonlyArray<FormattedText>> = pipe(
+  const scraper: Scraper<ReadonlyArray<FormattedText>> = pipe(
     Serial.stepNext(innerScraper),
     Serial.repeat,
     Serial.inSerial
@@ -375,17 +348,17 @@ const formattedTexts: Scraper.Scraper<ReadonlyArray<FormattedText>> = (spec) => 
   return scraper(spec)
 }
 
-const formattedText: Scraper.Scraper<FormattedText> = pipe(formattedTexts, Scraper.map(PlainTexts))
+const formattedText: Scraper<FormattedText> = pipe(formattedTexts, S.map(PlainTexts))
 
-const content: Scraper.Scraper<FormattedText> = pipe(
+const content: Scraper<FormattedText> = pipe(
   formattedText,
   // Prefer to extract just the article content.
-  Scraper.chroot(Select.tag('article')),
-  Scraper.alt(() =>
+  S.chroot(Select.tag('article')),
+  S.alt(() =>
     pipe(
       formattedText,
       // Fallback to everything in the body otherwise
-      Scraper.chroot(Select.tag('body'))
+      S.chroot(Select.tag('body'))
     )
   )
 )
@@ -415,7 +388,7 @@ const main: IO.IO<void> = pipe(
   IOE.chain((tokens) =>
     pipe(
       tokens,
-      Scraper.scrape(content),
+      S.scrape(content),
       O.map(printMd),
       IOE.fromOption(() => 'Unable to scrape the HTML')
     )

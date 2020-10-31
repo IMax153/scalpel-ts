@@ -24,25 +24,30 @@
  * with the following:
  *
  * ```typescript
+ * import { pipe } from 'fp-ts/function'
+ * import * as S from 'scalpel-ts/Scraper'
+ * import * as Select from 'scalpel-ts/Select'
+ * import * as Serial from 'scalpel-ts/SerialScraper'
+ *
  * pipe(
- *   Serial.seekNext(Scraper.text(Select.tag('h1'))),
+ *   Serial.seekNext(S.text(Select.tag('h1'))),
  *   Serial.bindTo('title'),
  *   Serial.bind('sections', () =>
  *     pipe(
- *       Serial.seekNext(Scraper.text(Select.tag('h2'))),
+ *       Serial.seekNext(S.text(Select.tag('h2'))),
  *       Serial.bindTo('section'),
  *       Serial.bind('ps', () =>
  *         pipe(
- *           Serial.seekNext(Scraper.text(Select.tag('p'))),
+ *           Serial.seekNext(S.text(Select.tag('p'))),
  *           Serial.repeat,
- *           Serial.untilNext(Scraper.matches(Select.tag('h2')))
+ *           Serial.untilNext(S.matches(Select.tag('h2')))
  *         )
  *       ),
  *       Serial.repeat
  *     )
  *   ),
  *   Serial.inSerial,
- *   Scraper.chroot(Select.tag('article'))
+ *   S.chroot(Select.tag('article'))
  * )
  * ```
  *
@@ -78,30 +83,27 @@
  *   }
  * ```
  *
- *
  * @since 0.0.1
  */
-import type { Alt1 } from 'fp-ts/lib/Alt'
-import type { Alternative1 } from 'fp-ts/lib/Alternative'
-import type { Applicative1 } from 'fp-ts/lib/Applicative'
-import type { Apply1 } from 'fp-ts/lib/Apply'
-import type { Functor1 } from 'fp-ts/lib/Functor'
-import type { Monad1 } from 'fp-ts/lib/Monad'
 import * as A from 'fp-ts/Array'
 import * as O from 'fp-ts/Option'
 import * as RA from 'fp-ts/ReadonlyArray'
 import * as RNEA from 'fp-ts/ReadonlyNonEmptyArray'
-import * as S from 'fp-ts/State'
-import * as T from 'fp-ts/Tuple'
-import { flow, identity, pipe, Endomorphism, Lazy } from 'fp-ts/function'
+import { flow, pipe } from 'fp-ts/function'
 import * as Z from 'fp-ts-contrib/Zipper'
 
-import { TagSpec } from './Internal/Tag/TagSpec'
 import type { Scraper } from './Scraper'
+import * as SO from './Internal/StateOption'
+import { TagSpec } from './Internal/Tag/TagSpec'
+
+export * from './Internal/StateOption'
 
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
+
+import Option = O.Option
+import StateOption = SO.StateOption
 
 /**
  * Serial scrapers operate on a zipper of `TagSpec`s that correspond to the root
@@ -119,7 +121,7 @@ import type { Scraper } from './Scraper'
  * @category model
  * @since 0.0.1
  */
-export type SpecZipper = Z.Zipper<O.Option<TagSpec>>
+export type SpecZipper = Z.Zipper<Option<TagSpec>>
 
 /**
  * Represents a `Scraper` that is able to be applied to a sequence of sibling nodes.
@@ -127,59 +129,11 @@ export type SpecZipper = Z.Zipper<O.Option<TagSpec>>
  * @category model
  * @since 0.0.1
  */
-export type SerialScraper<A> = S.State<SpecZipper, O.Option<A>>
+export type SerialScraper<A> = StateOption<SpecZipper, A>
 
 // -------------------------------------------------------------------------------------
-// constructors
+// destructors
 // -------------------------------------------------------------------------------------
-
-/**
- * @category constructors
- * @since 0.0.1
- */
-export const none: SerialScraper<never> = S.of(O.none)
-
-/**
- * @category constructors
- * @since 0.0.1
- */
-export const some: <A>(a: A) => SerialScraper<A> = (a) => S.of(O.some(a))
-
-/**
- * @category constructors
- * @since 0.0.1
- */
-export const get: () => SerialScraper<SpecZipper> = () => (s) => [O.some(s), s]
-
-/**
- * @category constructors
- * @since 0.0.1
- */
-export const put: (s: SpecZipper) => SerialScraper<void> = (s) => () => [O.some(undefined), s]
-
-/**
- * @category constructors
- * @since 0.0.1
- */
-export const modify: (f: Endomorphism<SpecZipper>) => SerialScraper<void> = (f) => (s) => [
-  O.some(undefined),
-  f(s)
-]
-
-/**
- * @category constructors
- * @since 0.0.1
- */
-export const gets: <A>(f: (s: SpecZipper) => A) => SerialScraper<A> = (f) => (s) => [
-  O.some(f(s)),
-  s
-]
-
-/**
- * @category constructors
- * @since 0.0.1
- */
-export const fromOption: <A>(ma: O.Option<A>) => SerialScraper<A> = S.of
 
 /**
  * Constructs a `SpecZipper` from a list of `TagSpec` instances. This requires
@@ -190,12 +144,8 @@ const zipperFromList: (specs: Array<TagSpec>) => SpecZipper = flow(
   A.reduceRight<TagSpec, SpecZipper>(Z.of(O.none), (spec, zipper) =>
     pipe(zipper, Z.insertLeft(O.some(spec)))
   ),
-  Z.insertLeft<O.Option<TagSpec>>(O.none)
+  Z.insertLeft<Option<TagSpec>>(O.none)
 )
-
-// -------------------------------------------------------------------------------------
-// destructors
-// -------------------------------------------------------------------------------------
 
 /**
  * Creates a `SpecZipper` from the current tag spec by generating a new tag spec
@@ -224,8 +174,8 @@ export const inSerial = <A>(serialScraper: SerialScraper<A>): Scraper<A> => (spe
         pipe(
           serialScraper,
           spec.context.inChroot
-            ? evaluate(toZipper(TagSpec(spec.context, root.forest, spec.tokens)))
-            : evaluate(toZipper(spec))
+            ? SO.evaluate(toZipper(TagSpec(spec.context, root.forest, spec.tokens)))
+            : SO.evaluate(toZipper(spec))
         )
     )
   )
@@ -237,7 +187,7 @@ export const inSerial = <A>(serialScraper: SerialScraper<A>): Scraper<A> => (spe
 export const repeat = <A>(serialScraper: SerialScraper<A>): SerialScraper<ReadonlyArray<A>> =>
   pipe(
     repeat1(serialScraper),
-    alt(() => of<ReadonlyArray<A>>(RA.empty))
+    SO.alt(() => SO.of<SpecZipper, ReadonlyArray<A>>(RA.empty))
   )
 
 export const repeat1 = <A>(
@@ -245,10 +195,10 @@ export const repeat1 = <A>(
 ): SerialScraper<RNEA.ReadonlyNonEmptyArray<A>> =>
   pipe(
     serialScraper,
-    chain((head) =>
+    SO.chain((head) =>
       pipe(
         repeat(serialScraper),
-        map((tail) => RNEA.cons(head, tail))
+        SO.map((tail) => RNEA.cons(head, tail))
       )
     )
   )
@@ -256,19 +206,19 @@ export const repeat1 = <A>(
 /**
  * Moves the cursor of a `SerialScraper` using the specified `move` function.
  */
-const stepWith = (move: (zipper: SpecZipper) => O.Option<SpecZipper>) => <A>(
+const stepWith = (move: (zipper: SpecZipper) => Option<SpecZipper>) => <A>(
   scraper: Scraper<A>
 ): SerialScraper<A> =>
   pipe(
-    get(),
-    chain((prev) => fromOption(move(prev))),
-    bindTo('next'),
-    bind('focus', ({ next }) => fromOption(next.focus)),
-    bind('value', ({ focus }) => fromOption(scraper(focus))),
-    chain(({ next, value }) =>
+    SO.get<SpecZipper>(),
+    SO.chainOptionK(move),
+    SO.bindTo('next'),
+    SO.bind('focus', ({ next }) => SO.fromOption(next.focus)),
+    SO.bind('value', ({ focus }) => SO.fromOption(scraper(focus))),
+    SO.chain(({ next, value }) =>
       pipe(
-        put(next),
-        map(() => value)
+        SO.put(next),
+        SO.map(() => value)
       )
     )
   )
@@ -276,34 +226,36 @@ const stepWith = (move: (zipper: SpecZipper) => O.Option<SpecZipper>) => <A>(
 /**
  * Moves the cursor of a `SerialScraper` using the specified `move` function.
  */
-const seekWith = (move: (specZipper: SpecZipper) => O.Option<SpecZipper>) => <A>(
+const seekWith = (move: (specZipper: SpecZipper) => Option<SpecZipper>) => <A>(
   scraper: Scraper<A>
 ): SerialScraper<A> => {
   const runScraper = (zipper: SpecZipper): SerialScraper<A> =>
     pipe(
-      fromOption(zipper.focus),
-      bindTo('focus'),
-      bind('value', ({ focus }) => fromOption(scraper(focus))),
-      chain(({ value }) =>
+      SO.get<SpecZipper>(),
+      SO.chain((curr) => SO.fromOption(curr.focus)),
+      SO.bindTo('focus'),
+      SO.bind('value', ({ focus }) => SO.fromOption(scraper(focus))),
+      SO.chain(({ value }) =>
         pipe(
-          put(zipper),
-          map(() => value)
+          SO.put(zipper),
+          SO.map(() => value)
         )
       )
     )
 
   const go = (prev: SpecZipper): SerialScraper<A> =>
     pipe(
-      fromOption(move(prev)),
-      chain((next) =>
+      SO.get<SpecZipper>(),
+      SO.chainOptionK(() => move(prev)),
+      SO.chain((next) =>
         pipe(
           runScraper(next),
-          alt(() => go(next))
+          SO.alt(() => go(next))
         )
       )
     )
 
-  return pipe(get(), chain(go))
+  return pipe(SO.get<SpecZipper>(), SO.chain(go))
 }
 
 /**
@@ -313,29 +265,30 @@ const seekWith = (move: (specZipper: SpecZipper) => O.Option<SpecZipper>) => <A>
  * `until` `Scraper` is matched by the focused node.
  */
 const untilWith = (
-  move: (specZipper: SpecZipper) => O.Option<SpecZipper>,
-  appendNode: (spec: O.Option<TagSpec>) => (specZipper: SpecZipper) => SpecZipper
+  move: (specZipper: SpecZipper) => Option<SpecZipper>,
+  appendNode: (spec: Option<TagSpec>) => (specZipper: SpecZipper) => SpecZipper
 ) => <A>(until: Scraper<A>) => <B>(scraper: SerialScraper<B>): SerialScraper<B> => {
   const split = (prev: SpecZipper): SerialScraper<SpecZipper> =>
     pipe(
-      fromOption(move(prev)),
-      bindTo('next'),
-      bind('spec', ({ next }) => fromOption(next.focus)),
-      chain(({ next, spec }) =>
+      SO.get<SpecZipper>(),
+      SO.chainOptionK(() => move(prev)),
+      SO.bindTo('next'),
+      SO.bind('spec', ({ next }) => SO.fromOption(next.focus)),
+      SO.chain(({ next, spec }) =>
         pipe(
-          until(spec),
-          fromOption,
-          map(() => Z.of<O.Option<TagSpec>>(O.none)),
-          alt(() => pipe(split(next), map(appendNode(O.some(spec)))))
+          SO.get<SpecZipper>(),
+          SO.chainOptionK(() => until(spec)),
+          SO.map(() => Z.of<Option<TagSpec>>(O.none)),
+          SO.alt(() => pipe(split(next), SO.map(appendNode(O.some(spec)))))
         )
       ),
-      alt(() => of(Z.of<O.Option<TagSpec>>(O.none)))
+      SO.alt(() => SO.of(Z.of<Option<TagSpec>>(O.none)))
     )
 
   return pipe(
-    get(),
-    chain(split),
-    chain((inner) => pipe(scraper, evaluate(appendNode(O.none)(inner)), fromOption))
+    SO.get<SpecZipper>(),
+    SO.chain(split),
+    SO.chainOptionK((inner) => pipe(scraper, SO.evaluate(appendNode(O.none)(inner))))
   )
 }
 
@@ -403,240 +356,3 @@ export const untilBack: <A>(
 export const untilNext: <A>(
   until: Scraper<A>
 ) => <B>(scraper: SerialScraper<B>) => SerialScraper<B> = untilWith(Z.down, Z.insertLeft)
-
-// -------------------------------------------------------------------------------------
-// non-pipeables
-// -------------------------------------------------------------------------------------
-
-const map_: Functor1<URI>['map'] = (fa, f) => pipe(fa, map(f))
-const ap_: Apply1<URI>['ap'] = (fab, fa) => pipe(fab, ap(fa))
-const chain_: Monad1<URI>['chain'] = (ma, f) => pipe(ma, chain(f))
-const alt_: Alternative1<URI>['alt'] = (fa, that) => pipe(fa, alt(that))
-
-// -------------------------------------------------------------------------------------
-// pipeables
-// -------------------------------------------------------------------------------------
-
-/**
- * @category Functor
- * @since 0.0.1
- */
-export const map: <A, B>(f: (a: A) => B) => (fa: SerialScraper<A>) => SerialScraper<B> = (f) =>
-  S.map(O.map(f))
-
-/**
- * @category Apply
- * @since 0.0.1
- */
-export const ap = <A>(
-  fa: SerialScraper<A>
-): (<B>(fab: SerialScraper<(a: A) => B>) => SerialScraper<B>) =>
-  flow(
-    S.map((gab) => (ga: O.Option<A>) => O.ap(ga)(gab)),
-    S.ap(fa)
-  )
-
-/**
- * @category Apply
- * @since 0.1.18
- */
-export const apFirst = <B>(fb: SerialScraper<B>): (<A>(fa: SerialScraper<A>) => SerialScraper<A>) =>
-  flow(
-    map((a) => () => a),
-    ap(fb)
-  )
-
-/**
- * @category Apply
- * @since 0.1.18
- */
-export const apSecond = <B>(
-  fb: SerialScraper<B>
-): (<A>(fa: SerialScraper<A>) => SerialScraper<B>) =>
-  flow(
-    map(() => (b: B) => b),
-    ap(fb)
-  )
-
-/**
- * @category Monad
- * @since 0.0.1
- */
-export const chain = <A, B>(f: (a: A) => SerialScraper<B>) => (
-  ma: SerialScraper<A>
-): SerialScraper<B> => pipe(ma, S.chain(O.fold<A, SerialScraper<B>>(() => none, f)))
-
-/**
- * @category Applicative
- * @since 0.0.1
- */
-export const of: Applicative1<URI>['of'] = some
-
-/**
- * @category Monad
- * @since 0.0.1
- */
-export const chainFirst: <A, B>(
-  f: (a: A) => SerialScraper<B>
-) => (ma: SerialScraper<A>) => SerialScraper<A> = (f) =>
-  chain((a) =>
-    pipe(
-      f(a),
-      map(() => a)
-    )
-  )
-
-/**
- * @category Monad
- * @since 0.0.1
- */
-export const flatten: <A>(mma: SerialScraper<SerialScraper<A>>) => SerialScraper<A> =
-  /* #__PURE__ */
-  chain(identity)
-
-/**
- * @category Alternative
- * @since 0.0.1
- */
-export const alt: <A>(
-  that: Lazy<SerialScraper<A>>
-) => (fa: SerialScraper<A>) => SerialScraper<A> = (that) => S.chain(O.fold(that, some))
-
-/**
- * @category Alternative
- * @since 0.0.1
- */
-export const zero: Alternative1<URI>['zero'] = () => none
-
-// -------------------------------------------------------------------------------------
-// instances
-// -------------------------------------------------------------------------------------
-
-/**
- * @category instances
- * @since 0.0.1
- */
-export const URI = 'SerialScraper'
-
-/**
- * @category instances
- * @since 0.0.1
- */
-export type URI = typeof URI
-
-declare module 'fp-ts/HKT' {
-  interface URItoKind<A> {
-    readonly [URI]: SerialScraper<A>
-  }
-}
-
-/**
- * @category instances
- * @since 0.0.1
- */
-export const Functor: Functor1<URI> = {
-  URI,
-  map: map_
-}
-
-/**
- * @category instances
- * @since 0.0.1
- */
-export const Apply: Apply1<URI> = {
-  URI,
-  map: map_,
-  ap: ap_
-}
-
-/**
- * @category instances
- * @since 0.0.1
- */
-export const Applicative: Applicative1<URI> = {
-  URI,
-  map: map_,
-  ap: ap_,
-  of
-}
-
-/**
- * @category instances
- * @since 0.0.1
- */
-export const Monad: Monad1<URI> = {
-  URI,
-  map: map_,
-  ap: ap_,
-  of,
-  chain: chain_
-}
-
-/**
- * @category instances
- * @since 0.0.1
- */
-export const Alt: Alt1<URI> = {
-  URI,
-  map: map_,
-  alt: alt_
-}
-
-/**
- * @category instances
- * @since 0.0.1
- */
-export const Alternative: Alternative1<URI> = {
-  URI,
-  map: map_,
-  ap: ap_,
-  of,
-  alt: alt_,
-  zero
-}
-
-// -------------------------------------------------------------------------------------
-// utils
-// -------------------------------------------------------------------------------------
-
-/**
- * @since 0.0.1
- */
-export const evaluate: (s: SpecZipper) => <A>(ma: SerialScraper<A>) => O.Option<A> = (s) => (ma) =>
-  T.fst(ma(s))
-
-/**
- * @since 0.0.1
- */
-export const execute: (s: SpecZipper) => <A>(ma: SerialScraper<A>) => SpecZipper = (s) => (ma) =>
-  T.snd(ma(s))
-
-// -------------------------------------------------------------------------------------
-// do notation
-// -------------------------------------------------------------------------------------
-
-/**
- * @category do notation
- * @since 0.0.1
- */
-export const bindTo = <N extends string>(
-  name: N
-): (<A>(fa: SerialScraper<A>) => SerialScraper<{ [K in N]: A }>) =>
-  map((b) => ({ [name]: b } as any))
-
-/**
- * @category do notation
- * @since 0.0.1
- */
-export const bind = <N extends string, A, B>(
-  name: Exclude<N, keyof A>,
-  f: (a: A) => SerialScraper<B>
-): ((
-  fa: SerialScraper<A>
-) => SerialScraper<{ [K in keyof A | N]: K extends keyof A ? A[K] : B }>) =>
-  chain((a) =>
-    pipe(
-      f(a),
-      map((b) => ({ ...a, [name]: b } as any))
-    )
-  )

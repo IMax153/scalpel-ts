@@ -4,8 +4,10 @@ import * as IOE from 'fp-ts/IOEither'
 import { pipe } from 'fp-ts/function'
 
 import * as Select from '../src/Select'
-import * as Scraper from '../src/Scraper'
+import * as S from '../src/Scraper'
 import { parse } from '../src/Internal/Html/Tokenizer'
+
+import Scraper = S.Scraper
 
 const exampleHTML = `
 <html>
@@ -32,17 +34,15 @@ const exampleHTML = `
 </html>
 `
 
-const catComment: Scraper.Scraper<string> = pipe(
+const catComment: Scraper<string> = pipe(
   // 2. The `any` selector can be used to access the root tag of the current context
-  Scraper.text(Select.any),
+  S.text(Select.any),
   // 3. Skip any comment divs that do not contain the word "cat"
-  Scraper.filter((content) => content.includes('cat')),
+  S.filter((content) => content.includes('cat')),
   // 4. Generate the desired return value
-  Scraper.chain(() => Scraper.html(Select.any)),
+  S.chain(() => S.html(Select.any)),
   // 1. Narrow the current context to the div containing the comment's textual content
-  Scraper.chroot(
-    Select.withAttributes('div', [Select.hasClass('comment'), Select.hasClass('text')])
-  )
+  S.chroot(Select.withAttributes('div', [Select.hasClass('comment'), Select.hasClass('text')]))
 )
 
 const main: IO.IO<void> = pipe(
@@ -52,7 +52,7 @@ const main: IO.IO<void> = pipe(
   IOE.chain((tokens) =>
     pipe(
       tokens,
-      Scraper.scrape(catComment),
+      S.scrape(catComment),
       IOE.fromOption(() => 'Unable to scrape HTML')
     )
   ),
