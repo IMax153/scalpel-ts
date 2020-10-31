@@ -1,3 +1,7 @@
+/**
+ * @since 0.0.1
+ */
+import type { Option } from 'fp-ts/Option'
 import * as Eq from 'fp-ts/Eq'
 import * as O from 'fp-ts/Option'
 import * as Ord from 'fp-ts/Ord'
@@ -5,7 +9,8 @@ import * as RA from 'fp-ts/ReadonlyArray'
 import * as RM from 'fp-ts/ReadonlyMap'
 import { flow, pipe, Endomorphism } from 'fp-ts/function'
 
-import * as T from '../Html/Token'
+import type { Token } from '../Html/Tokenizer'
+import * as T from '../Html/Tokenizer'
 
 // -------------------------------------------------------------------------------------
 // model
@@ -18,7 +23,7 @@ import * as T from '../Html/Token'
  * @category model
  * @since 0.0.1
  */
-export interface TokenInfo {
+export interface TagInfo {
   /**
    * The name of the parsed token, if present. Tokens that have associated names
    * include:
@@ -27,16 +32,16 @@ export interface TokenInfo {
    * - `TagClose`
    * - `Doctype`
    */
-  readonly name: O.Option<string>
+  readonly name: Option<string>
   /**
    * The parsed token.
    */
-  readonly token: T.Token
+  readonly token: Token
   /**
    * The offset from the parsed token to the token that contains its closing tag,
    * if present. The only tokens that will have an offset are `TagOpen` tokens.
    */
-  readonly closeOffset: O.Option<number>
+  readonly closeOffset: Option<number>
 }
 
 // -------------------------------------------------------------------------------------
@@ -47,11 +52,11 @@ export interface TokenInfo {
  * @category constructors
  * @since 0.0.1
  */
-export const TokenInfo = (
-  name: O.Option<string>,
-  token: T.Token,
-  closeOffset: O.Option<number>
-): TokenInfo => ({
+export const TagInfo = (
+  name: Option<string>,
+  token: Token,
+  closeOffset: Option<number>
+): TagInfo => ({
   name,
   token,
   closeOffset
@@ -59,29 +64,26 @@ export const TokenInfo = (
 
 interface IndexedToken {
   readonly index: number
-  readonly token: T.Token
+  readonly token: Token
 }
 
-interface IndexedTokenInfo {
+interface IndexedTagInfo {
   readonly index: number
-  readonly tokenInfo: TokenInfo
+  readonly tokenInfo: TagInfo
 }
 
-const tokenName: (token: T.Token) => O.Option<string> = T.fold({
+const tokenName: (token: Token) => Option<string> = T.fold({
   TagOpen: (name) => O.some(name),
-  TagSelfClose: (name) => O.some(name),
   TagClose: (name) => O.some(name),
-  ContentText: () => O.none,
-  ContentChar: () => O.none,
-  Comment: () => O.none,
-  Doctype: () => O.some('doctype')
+  Text: () => O.none,
+  Comment: () => O.none
 })
 
 /**
  * Alters a value `V` at the key `K`, or absence thereof. Can be used to insert, delete,
  * or update a value in a `ReadonlyMap`.
  */
-const alterMap = <K>(E: Eq.Eq<K>) => <V>(key: K, f: Endomorphism<O.Option<V>>) => (
+const alterMap = <K>(E: Eq.Eq<K>) => <V>(key: K, f: Endomorphism<Option<V>>) => (
   map: ReadonlyMap<K, V>
 ): ReadonlyMap<K, V> =>
   pipe(
@@ -103,23 +105,23 @@ const alterMap = <K>(E: Eq.Eq<K>) => <V>(key: K, f: Endomorphism<O.Option<V>>) =
     )
   )
 
-const appendToken = (token: IndexedToken): Endomorphism<O.Option<ReadonlyArray<IndexedToken>>> =>
+const appendToken = (token: IndexedToken): Endomorphism<Option<ReadonlyArray<IndexedToken>>> =>
   O.fold(
     () => O.some(RA.of(token)),
     (xs) => pipe(xs, RA.cons(token), O.some)
   )
 
-const popToken: Endomorphism<O.Option<ReadonlyArray<IndexedToken>>> = O.fold(
+const popToken: Endomorphism<Option<ReadonlyArray<IndexedToken>>> = O.fold(
   () => O.none,
   (xs) => RA.tail(xs)
 )
 
-const calculateOffset = (start: IndexedToken) => (end: IndexedToken): IndexedTokenInfo => {
-  const info = TokenInfo(tokenName(start.token), end.token, O.some(start.index - end.index))
+const calculateOffset = (start: IndexedToken) => (end: IndexedToken): IndexedTagInfo => {
+  const info = TagInfo(tokenName(start.token), end.token, O.some(start.index - end.index))
   return { index: end.index, tokenInfo: info }
 }
 
-const ordIndexedTokenInfo: Ord.Ord<IndexedTokenInfo> = pipe(
+const ordIndexedTagInfo: Ord.Ord<IndexedTagInfo> = pipe(
   Ord.ordNumber,
   Ord.contramap(({ index }) => index)
 )
@@ -154,12 +156,12 @@ const ordIndexedTokenInfo: Ord.Ord<IndexedTokenInfo> = pipe(
  * @category constructors
  * @since 0.0.1
  */
-export const annotateTokens: (tokens: ReadonlyArray<T.Token>) => ReadonlyArray<TokenInfo> = (
+export const annotateTokens: (tokens: ReadonlyArray<Token>) => ReadonlyArray<TagInfo> = (
   tokens
 ) => {
   const go = (indexedTokens: ReadonlyArray<IndexedToken>) => (
     tokenMap: ReadonlyMap<string, ReadonlyArray<IndexedToken>>
-  ): ReadonlyArray<IndexedTokenInfo> =>
+  ): ReadonlyArray<IndexedTagInfo> =>
     pipe(
       indexedTokens,
       RA.foldLeft(
@@ -172,7 +174,7 @@ export const annotateTokens: (tokens: ReadonlyArray<T.Token>) => ReadonlyArray<T
             RA.flatten,
             RA.map(({ index, token }) => ({
               index,
-              tokenInfo: TokenInfo(tokenName(token), token, O.none)
+              tokenInfo: TagInfo(tokenName(token), token, O.none)
             }))
           ),
         (x, xs) =>
@@ -181,12 +183,6 @@ export const annotateTokens: (tokens: ReadonlyArray<T.Token>) => ReadonlyArray<T
             T.fold({
               TagOpen: (name) =>
                 pipe(tokenMap, alterMap(Eq.eqString)(name, appendToken(x)), go(xs)),
-              TagSelfClose: (name) =>
-                pipe(
-                  tokenMap,
-                  go(xs),
-                  RA.cons({ index: x.index, tokenInfo: TokenInfo(O.some(name), x.token, O.none) })
-                ),
               TagClose: (name) =>
                 pipe(
                   tokenMap,
@@ -194,41 +190,26 @@ export const annotateTokens: (tokens: ReadonlyArray<T.Token>) => ReadonlyArray<T
                   O.chain(RA.head),
                   O.traverse(RA.Applicative)(flow(calculateOffset(x), RA.of)),
                   RA.cons(
-                    O.some({ index: x.index, tokenInfo: TokenInfo(O.some(name), x.token, O.none) })
+                    O.some({ index: x.index, tokenInfo: TagInfo(O.some(name), x.token, O.none) })
                   ),
                   RA.compact,
                   (ys) =>
-                    RA.getMonoid<IndexedTokenInfo>().concat(
+                    RA.getMonoid<IndexedTagInfo>().concat(
                       ys,
                       pipe(tokenMap, alterMap(Eq.eqString)(name, popToken), go(xs))
                     )
                 ),
-              ContentText: () =>
+              Text: () =>
                 pipe(
                   tokenMap,
                   go(xs),
-                  RA.cons({ index: x.index, tokenInfo: TokenInfo(O.none, x.token, O.none) })
-                ),
-              ContentChar: () =>
-                pipe(
-                  tokenMap,
-                  go(xs),
-                  RA.cons({ index: x.index, tokenInfo: TokenInfo(O.none, x.token, O.none) })
+                  RA.cons({ index: x.index, tokenInfo: TagInfo(O.none, x.token, O.none) })
                 ),
               Comment: () =>
                 pipe(
                   tokenMap,
                   go(xs),
-                  RA.cons({ index: x.index, tokenInfo: TokenInfo(O.none, x.token, O.none) })
-                ),
-              Doctype: () =>
-                pipe(
-                  tokenMap,
-                  go(xs),
-                  RA.cons({
-                    index: x.index,
-                    tokenInfo: TokenInfo(O.some('doctype'), x.token, O.none)
-                  })
+                  RA.cons({ index: x.index, tokenInfo: TagInfo(O.none, x.token, O.none) })
                 )
             })
           )
@@ -242,7 +223,7 @@ export const annotateTokens: (tokens: ReadonlyArray<T.Token>) => ReadonlyArray<T
         RA.mapWithIndex((index, token) => ({ index, token }))
       )
     ),
-    RA.sort(ordIndexedTokenInfo),
+    RA.sort(ordIndexedTagInfo),
     RA.map(({ tokenInfo }) => tokenInfo)
   )
 }

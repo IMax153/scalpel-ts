@@ -2,11 +2,10 @@ import * as C from 'fp-ts/Console'
 import * as IO from 'fp-ts/IO'
 import * as IOE from 'fp-ts/IOEither'
 import { pipe } from 'fp-ts/function'
-import { run } from 'parser-ts/code-frame'
 
 import * as Select from '../src/Select'
-import * as Scraper from '../src/Scraper'
-import { parse } from '../src/Html/Parser'
+import * as S from '../src/Scraper'
+import { parse } from '../src/Internal/Html/Tokenizer'
 
 const exampleHTML = `
 <html>
@@ -33,6 +32,8 @@ const exampleHTML = `
 </html>
 `
 
+import Scraper = S.Scraper
+
 type Author = string
 
 type Comment = TextComment | ImageComment
@@ -49,44 +50,38 @@ interface ImageComment {
   readonly url: string
 }
 
-const textComment: Scraper.Scraper<Comment> = pipe(
-  Scraper.of('TextComment' as const),
-  Scraper.bindTo('_tag'),
-  Scraper.bind('author', () =>
-    Scraper.text(Select.withAttributes('span', [Select.hasClass('author')]))
-  ),
-  Scraper.bind('text', () => Scraper.text(Select.withAttributes('div', [Select.hasClass('text')])))
+const textComment: Scraper<Comment> = pipe(
+  S.of('TextComment' as const),
+  S.bindTo('_tag'),
+  S.bind('author', () => S.text(Select.withAttributes('span', [Select.hasClass('author')]))),
+  S.bind('text', () => S.text(Select.withAttributes('div', [Select.hasClass('text')])))
 )
 
-const imageComment: Scraper.Scraper<Comment> = pipe(
-  Scraper.of('ImageComment' as const),
-  Scraper.bindTo('_tag'),
-  Scraper.bind('author', () =>
-    Scraper.text(Select.withAttributes('span', [Select.hasClass('author')]))
-  ),
-  Scraper.bind('url', () =>
-    Scraper.attr('src', Select.withAttributes('img', [Select.hasClass('image')]))
-  )
+const imageComment: Scraper<Comment> = pipe(
+  S.of('ImageComment' as const),
+  S.bindTo('_tag'),
+  S.bind('author', () => S.text(Select.withAttributes('span', [Select.hasClass('author')]))),
+  S.bind('url', () => S.attr('src', Select.withAttributes('img', [Select.hasClass('image')])))
 )
 
-const comment: Scraper.Scraper<Comment> = pipe(
+const comment: Scraper<Comment> = pipe(
   textComment,
-  Scraper.alt(() => imageComment)
+  S.alt(() => imageComment)
 )
 
-const comments: Scraper.Scraper<ReadonlyArray<Comment>> = pipe(
+const comments: Scraper<ReadonlyArray<Comment>> = pipe(
   comment,
-  Scraper.chroots(Select.withAttributes('div', [Select.hasClass('container')]))
+  S.chroots(Select.withAttributes('div', [Select.hasClass('container')]))
 )
 
 const main: IO.IO<void> = pipe(
-  run(parse, exampleHTML),
+  parse(exampleHTML),
   IOE.fromEither,
   IOE.mapLeft(() => 'Unable to parse HTML'),
   IOE.chain((tokens) =>
     pipe(
       tokens,
-      Scraper.scrape(comments),
+      S.scrape(comments),
       IOE.fromOption(() => 'Unable to scrape HTML')
     )
   ),

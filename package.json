@@ -13,7 +13,7 @@
   "dependencies": {
     "fp-ts": "^2.8.3",
     "fp-ts-contrib": "^0.1.21",
-    "parser-ts": "^0.6.10"
+    "htmlparser2": "^5.0.1"
   },
   "devDependencies": {
     "@types/jest": "^26.0.14",
