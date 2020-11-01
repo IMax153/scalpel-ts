@@ -8,7 +8,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "ts-node -O '{\"module\": \"commonjs\"}' src",
-    "test": "jest"
+    "test": "jest",
+    "test:watch": "jest --watchAll"
   },
   "dependencies": {
     "fp-ts": "^2.8.3",
@@ -26,6 +27,8 @@
     "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-jest": "^24.0.2",
     "eslint-plugin-prettier": "^3.1.4",
+    "fast-check": "^2.6.0",
+    "fp-ts-laws": "^0.3.0",
     "husky": "^4.3.0",
     "jest": "^26.4.2",
     "lint-staged": "^10.4.0",
