@@ -410,7 +410,7 @@ export const select = (selector: Selector) => (spec: TagSpec): ReadonlyArray<Tag
   F.pipe(
     RA.empty,
     selectNodes(selector, spec, spec),
-    RA.mapWithIndex((p, s) => TS.TagSpec(SelectContext(p, true), s.hierarchy, s.tokens))
+    RA.mapWithIndex((p, s) => TS.TagSpec(SelectContext(p, true), s.hierarchy, s.tags))
   )
 
 const recenter = (parent: TagSpan) => (child: TagSpan): TagSpan =>
@@ -421,11 +421,11 @@ const shrinkSpecWith = (spec: TagSpec, parent: Tree<TagSpan>): TagSpec => {
   return TS.TagSpec(
     spec.context,
     F.pipe(parent, Tr.map(recenter(parent.value)), A.of),
-    spec.tokens.slice(start, end + 1)
+    spec.tags.slice(start, end + 1)
   )
 }
 const updateHierarchy = (curr: TagSpec, hierarchy: TagForest): TagSpec =>
-  TS.TagSpec(curr.context, hierarchy, curr.tokens)
+  TS.TagSpec(curr.context, hierarchy, curr.tags)
 
 const selectNodes = (selectors: Selector, curr: TagSpec, root: TagSpec) => (
   acc: ReadonlyArray<TagSpec>
@@ -447,7 +447,7 @@ const selectNodes = (selectors: Selector, curr: TagSpec, root: TagSpec) => (
               // for each node that satisfies the condition
               if (RA.isEmpty(ns)) {
                 return F.pipe(
-                  curr.tokens,
+                  curr.tags,
                   RA.lookup(start),
                   O.fold(
                     () => MR.MatchFail,
@@ -500,7 +500,7 @@ const selectNodes = (selectors: Selector, curr: TagSpec, root: TagSpec) => (
               const siblings = F.pipe(fs, liftSiblings([]))
 
               return F.pipe(
-                curr.tokens,
+                curr.tags,
                 RA.lookup(start),
                 O.fold(
                   () => MR.MatchFail,
