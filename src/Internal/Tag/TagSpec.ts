@@ -22,7 +22,7 @@ import * as I from './TagInfo'
 export interface TagSpec {
   readonly context: SelectContext
   readonly hierarchy: TagForest
-  readonly tokens: ReadonlyArray<TagInfo>
+  readonly tags: ReadonlyArray<TagInfo>
 }
 
 // -------------------------------------------------------------------------------------
@@ -36,11 +36,11 @@ export interface TagSpec {
 export const TagSpec = (
   context: SelectContext,
   hierarchy: TagForest,
-  tokens: ReadonlyArray<TagInfo>
+  tags: ReadonlyArray<TagInfo>
 ): TagSpec => ({
   context,
   hierarchy,
-  tokens
+  tags
 })
 
 /**
@@ -49,8 +49,8 @@ export const TagSpec = (
  * @category constructors
  * @since 0.0.1
  */
-export const tokensToSpec = (tokens: ReadonlyArray<Token>): TagSpec => {
-  const annotatedTokens = I.annotateTokens(tokens)
-  const hierarchy = F.fromTagInfo(annotatedTokens)
-  return TagSpec({ position: 0, inChroot: false }, hierarchy, annotatedTokens)
+export const tagsToSpec = (tokens: ReadonlyArray<Token>): TagSpec => {
+  const annotatedTags = I.annotateTags(tokens)
+  const hierarchy = F.fromTagInfo(annotatedTags)
+  return TagSpec({ position: 0, inChroot: false }, hierarchy, annotatedTags)
 }

@@ -1,6 +1,5 @@
 import * as assert from 'assert'
 import * as fc from 'fast-check'
-import * as laws from 'fp-ts-laws'
 import * as Eq from 'fp-ts/Eq'
 
 import * as MR from '../../src/Internal/MatchResult'
@@ -50,7 +49,14 @@ describe('MatchResult', () => {
 
   describe('instances', () => {
     it('semigroupMatchResult', () => {
-      laws.semigroup(MR.semigroupMatchResult, Eq.eqString, arb)
+      const S = MR.semigroupMatchResult
+      const E = Eq.eqString
+      const arb = fc.constantFrom(MR.MatchOk, MR.MatchFail, MR.MatchCull)
+      fc.assert(
+        fc.property(arb, arb, arb, (a, b, c) =>
+          E.equals(S.concat(a, S.concat(b, c)), S.concat(S.concat(a, b), c))
+        )
+      )
     })
   })
 })

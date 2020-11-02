@@ -153,7 +153,7 @@ const zipperFromList: (specs: Array<TagSpec>) => SpecZipper = flow(
 const toZipper = (spec: TagSpec): SpecZipper =>
   pipe(
     spec.hierarchy,
-    A.map((f) => TagSpec(spec.context, A.of(f), spec.tokens)),
+    A.map((f) => TagSpec(spec.context, A.of(f), spec.tags)),
     zipperFromList
   )
 
@@ -173,7 +173,7 @@ export const inSerial = <A>(serialScraper: SerialScraper<A>): Scraper<A> => (spe
         pipe(
           serialScraper,
           spec.context.inChroot
-            ? SO.evaluate(toZipper(TagSpec(spec.context, root.forest, spec.tokens)))
+            ? SO.evaluate(toZipper(TagSpec(spec.context, root.forest, spec.tags)))
             : SO.evaluate(toZipper(spec))
         )
     )

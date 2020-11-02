@@ -45,7 +45,7 @@ export type Scraper<A> = ReaderOption<TagSpec, A>
  * @since 0.0.1
  */
 export const scrape = <A>(scraper: Scraper<A>): ((tags: ReadonlyArray<T.Token>) => Option<A>) =>
-  flow(TS.tokensToSpec, scrapeTagSpec(scraper))
+  flow(TS.tagsToSpec, scrapeTagSpec(scraper))
 
 /**
  * The `scrapeRaw` function executes a `Scraper` on the `source` and produces either
@@ -312,7 +312,7 @@ const withAll = <A, B>(f: (a: A) => B): ((as: ReadonlyArray<A>) => Scraper<Reado
  */
 const foldSpec = <B>(M: M.Monoid<B>) => (f: (a: T.Token) => B) => (spec: TagSpec): B =>
   pipe(
-    spec.tokens,
+    spec.tags,
     RA.foldMap(M)((info) => f(info.token))
   )
 
@@ -365,10 +365,8 @@ const tagsToHtml: (spec: TagSpec) => string = foldSpec(M.monoidString)(T.showTok
  * set of tags within, but not including, the selected tags.
  */
 const tagsToInnerHTML: (spec: TagSpec) => string = (spec) => {
-  const len = spec.tokens.length
-  return len < 2
-    ? M.monoidString.empty
-    : tagsToHtml({ ...spec, tokens: spec.tokens.slice(1, len - 2) })
+  const len = spec.tags.length
+  return len < 2 ? M.monoidString.empty : tagsToHtml({ ...spec, tags: spec.tags.slice(1, len - 2) })
 }
 
 /**
