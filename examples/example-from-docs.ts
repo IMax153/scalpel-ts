@@ -3,9 +3,10 @@ import * as IO from 'fp-ts/IO'
 import * as IOE from 'fp-ts/IOEither'
 import { pipe } from 'fp-ts/function'
 
+import type { Scraper } from '../src/Scraper'
+import * as F from '../src/Fetch'
 import * as Select from '../src/Select'
-import * as S from '../src/Scraper'
-import { parse } from '../src/Internal/Html/Tokenizer'
+import * as Scrape from '../src/Scraper'
 
 const exampleHTML = `
 <html>
@@ -32,8 +33,6 @@ const exampleHTML = `
 </html>
 `
 
-import Scraper = S.Scraper
-
 type Author = string
 
 type Comment = TextComment | ImageComment
@@ -51,40 +50,39 @@ interface ImageComment {
 }
 
 const textComment: Scraper<Comment> = pipe(
-  S.of('TextComment' as const),
-  S.bindTo('_tag'),
-  S.bind('author', () => S.text(Select.withAttributes('span', [Select.hasClass('author')]))),
-  S.bind('text', () => S.text(Select.withAttributes('div', [Select.hasClass('text')])))
+  Scrape.of('TextComment' as const),
+  Scrape.bindTo('_tag'),
+  Scrape.bind('author', () =>
+    Scrape.text(Select.withAttributes('span', [Select.hasClass('author')]))
+  ),
+  Scrape.bind('text', () => Scrape.text(Select.withAttributes('div', [Select.hasClass('text')])))
 )
 
 const imageComment: Scraper<Comment> = pipe(
-  S.of('ImageComment' as const),
-  S.bindTo('_tag'),
-  S.bind('author', () => S.text(Select.withAttributes('span', [Select.hasClass('author')]))),
-  S.bind('url', () => S.attr('src', Select.withAttributes('img', [Select.hasClass('image')])))
+  Scrape.of('ImageComment' as const),
+  Scrape.bindTo('_tag'),
+  Scrape.bind('author', () =>
+    Scrape.text(Select.withAttributes('span', [Select.hasClass('author')]))
+  ),
+  Scrape.bind('url', () =>
+    Scrape.attr('src', Select.withAttributes('img', [Select.hasClass('image')]))
+  )
 )
 
 const comment: Scraper<Comment> = pipe(
   textComment,
-  S.alt(() => imageComment)
+  Scrape.alt(() => imageComment)
 )
 
 const comments: Scraper<ReadonlyArray<Comment>> = pipe(
   comment,
-  S.chroots(Select.withAttributes('div', [Select.hasClass('container')]))
+  Scrape.chroots(Select.withAttributes('div', [Select.hasClass('container')]))
 )
 
 const main: IO.IO<void> = pipe(
-  parse(exampleHTML),
+  comments,
+  F.scrapeRaw(exampleHTML),
   IOE.fromEither,
-  IOE.mapLeft(() => 'Unable to parse HTML'),
-  IOE.chain((tokens) =>
-    pipe(
-      tokens,
-      S.scrape(comments),
-      IOE.fromOption(() => 'Unable to scrape HTML')
-    )
-  ),
   IOE.fold(C.error, C.log)
 )
 

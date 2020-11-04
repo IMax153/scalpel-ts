@@ -1,19 +1,34 @@
 /**
+ * Note
+ * ----
+ * The default behaviour of `scrapeURL` and `fetchTags` is to use the `fetch` implementation
+ * provided by the `globalThis` object to download the contents of a remote url. If executing
+ * either of these functions in an environment where `globalThis` is undefined, then the
+ * `globalThis` object and its `fetch` implementation should be polyfilled.
+ *
+ * Similarly, if `globalThis` is defined for your environment, but `globalThis.fetch` is not,
+ * then the `fetch` implementation for `globalThis` should be polyfilled. Alternatively, an
+ * explicit configuration for `fetch` can be provided using the `scrapeURLWithConfig` and
+ * `fetchTagsWithConfig` functions.
+ *
  * @since 0.0.1
  */
-import type { Option } from 'fp-ts/Option'
+import type { Either } from 'fp-ts/Either'
 import type { TaskEither } from 'fp-ts/TaskEither'
 import type { ReaderTaskEither } from 'fp-ts/ReaderTaskEither'
+import type { Predicate } from 'fp-ts/function'
+import { TextDecoder } from 'util'
+import * as E from 'fp-ts/Either'
+import * as IOE from 'fp-ts/IOEither'
 import * as O from 'fp-ts/Option'
-import * as T from 'fp-ts/Task'
 import * as TE from 'fp-ts/TaskEither'
 import * as RTE from 'fp-ts/ReaderTaskEither'
-import { pipe } from 'fp-ts/function'
+import { flow, pipe } from 'fp-ts/function'
 
-import type { Decoder } from './Internal/Fetch/Decoder'
-import type { FetchError } from './Internal/Fetch/FetchError'
-import * as FE from './Internal/Fetch/FetchError'
-import * as D from './Internal/Fetch/Decoder'
+import type { Scraper } from './Scraper'
+import type { Token } from './Internal/Html/Tokenizer'
+import * as T from './Internal/Html/Tokenizer'
+import * as Scrape from './Scraper'
 
 // -------------------------------------------------------------------------------------
 // model
@@ -28,42 +43,30 @@ import * as D from './Internal/Fetch/Decoder'
 export type GlobalFetch = typeof globalThis.fetch
 
 /**
- * Represents an asynchronous computation that either returns a value of type `A`
- * or fails yielding an error of type `FetchError<E>`.
+ * Represents a function that reads from an HTTP response and returns the
+ * a `Promise` which resolves with the response body as a string.
  *
  * @category model
  * @since 0.0.1
  */
-export type Fetch<E, A> = ReaderTaskEither<FetchOptions<E, A>, FetchError<E>, A>
+export type ResponseDecoder = ReaderTaskEither<Response, string, string>
 
 /**
- * Represents the result of a fetch operation which is a Promise that can resolve
- * to either a value of type `A` or an error of type `FetchError<E>`.
+ * Represents a configuration object that determines how `scrapeURLWithConfig`
+ * interacts with a remote HTTP server and interprets the results.
  *
  * @category model
  * @since 0.0.1
  */
-export type FetchResult<E, A> = TaskEither<FetchError<E>, A>
-
-/**
- * Represents options that can be used to create a fetch operation.
- *
- * @category model
- * @since 0.0.1
- */
-export interface FetchOptions<E, A> {
+export interface FetchConfig {
   /**
    * An implementation of the fetch API to utilize.
    */
   readonly fetch: GlobalFetch
   /**
-   * A decoder for a fetch error.
+   * A decoder that will decode the body of a `Response` as a string.
    */
-  readonly errorDecoder: Decoder<E>
-  /**
-   * A decoder for a fetch response.
-   */
-  readonly responseDecoder: Decoder<A>
+  readonly decoder: ResponseDecoder
 }
 
 // -------------------------------------------------------------------------------------
@@ -74,119 +77,171 @@ export interface FetchOptions<E, A> {
  * @category constructors
  * @since 0.0.1
  */
-export const fetchOptions = <E, A>(
+export const FetchConfig = (
   fetch: GlobalFetch,
-  errorDecoder: Decoder<E>,
-  responseDecoder: Decoder<A>
-): FetchOptions<E, A> => ({
+  decoder: ResponseDecoder = defaultDecoder
+): FetchConfig => ({
   fetch,
-  errorDecoder,
-  responseDecoder
+  decoder
 })
 
+// -------------------------------------------------------------------------------------
+// decoders
+// -------------------------------------------------------------------------------------
+
 /**
- * Constructs a fetch operation which can be provided custom `FetchOptions`.
- *
- * @category constructors
- * @since 0.0.1
+ * Checks whether the specified `type` is equivalent to the "content-type" returned
+ * by the fetch operation.
  */
-export const custom = <E, A>(url: RequestInfo, init?: RequestInit): Fetch<E, A> =>
-  pipe(
-    RTE.ask<FetchOptions<E, A>>(),
-    RTE.chain<FetchOptions<E, A>, FetchError<E>, FetchOptions<E, A>, A>((opts) =>
-      pipe(
-        TE.tryCatch(
-          () => opts.fetch(url, init),
-          (err) => FE.NetworkError((err as Error).message)
-        ),
-        RTE.fromTaskEither,
-        RTE.chainTaskEitherK((response) =>
-          response.ok
-            ? onSuccess(response, opts.responseDecoder)
-            : onFailure(response, opts.errorDecoder)
-        )
+const isType: (type: string) => Predicate<string> = (t) => (ct) =>
+  ct.toLowerCase().includes(`charset=${t}`)
+
+/**
+ * A decoder that will always decode the Response body using 'UTF-8' encoding.
+ */
+const utf8Decoder: ResponseDecoder = pipe(
+  RTE.ask<Response, string>(),
+  RTE.chain((res) => RTE.fromTask(() => res.arrayBuffer())),
+  RTE.chain((buffer) =>
+    RTE.fromEither(
+      E.tryCatch(() => new TextDecoder('utf-8', { fatal: true }).decode(buffer), String)
+    )
+  )
+)
+
+/**
+ * A decoder that will always decode the Response body using 'ISO-8859-1' encoding.
+ */
+const iso88591Decoder: ResponseDecoder = pipe(
+  RTE.ask<Response, string>(),
+  RTE.chain((res) => RTE.fromTask(() => res.arrayBuffer())),
+  RTE.chain((buffer) =>
+    RTE.fromEither(
+      E.tryCatch(() => new TextDecoder('iso-8859-1', { fatal: true }).decode(buffer), String)
+    )
+  )
+)
+
+/**
+ * The default `ResponseDecoder`. This decoder will attempt to infer the character
+ * set of the HTTP response body from the `Content-Type` header. If the header is
+ * not present, the character set is assumed to be `ISO-8859-1`.
+ */
+const defaultDecoder: ResponseDecoder = pipe(
+  RTE.ask<Response, string>(),
+  RTE.chain((res) =>
+    pipe(
+      O.fromNullable(res.headers.get('content-type')),
+      O.chain(O.fromPredicate(isType('utf-8'))),
+      O.fold(
+        () => iso88591Decoder,
+        () => utf8Decoder
       )
     )
   )
-
-/**
- * Constructs a fetch operation which returns the raw `Response` object.
- *
- * @category constructors
- * @since 0.0.1
- */
-export const raw = (url: RequestInfo, init?: RequestInit): FetchResult<Response, Response> =>
-  pipe(fetchOptions(globalThis.fetch, D.raw, D.raw), custom(url, init))
-
-/**
- * Constructs a fetch operation which returns the `Response` object decoded
- * as a JSON object.
- *
- * @category constructors
- * @since 0.0.1
- */
-export const json = (url: RequestInfo, init?: RequestInit): FetchResult<JSON, JSON> =>
-  pipe(fetchOptions(globalThis.fetch, D.json, D.json), custom(url, init))
-
-/**
- * Constructs a fetch operation which returns the `Response` object decoded
- * as text.
- *
- * @category constructors
- * @since 0.0.1
- */
-export const text = (url: RequestInfo, init?: RequestInit): FetchResult<string, string> =>
-  pipe(fetchOptions(globalThis.fetch, D.text, D.text), custom(url, init))
-
-/**
- * Constructs a fetch operation which discards the `Response` object body.
- * Useful for checking if a fetch operation executed successfully (i.e.
- * returned a 200 status code).
- *
- * @category constructors
- * @since 0.0.1
- */
-export const never = (url: RequestInfo, init?: RequestInit): FetchResult<void, void> =>
-  pipe(fetchOptions(globalThis.fetch, D.never, D.never), custom(url, init))
+)
 
 // -------------------------------------------------------------------------------------
 // utils
 // -------------------------------------------------------------------------------------
 
 /**
+ * Parses a raw HTML string into a list of `Token`s.
+ *
  * @category utils
  * @since 0.0.1
  */
-export const foldError: <E, R>(patterns: {
-  readonly NetworkError: (message: string) => R
-  readonly DecodeError: (message: string) => R
-  readonly ResponseError: (
-    message: string,
-    status: number,
-    body: Option<E>,
-    decodeError: Option<FE.DecodeError>
-  ) => R
-}) => (error: FetchError<E>) => R = FE.fold
+export const fetchTagsRaw: (html: string) => ReadonlyArray<Token> = T.parse
 
-const onSuccess = <E, A>(response: Response, decoder: Decoder<A>): FetchResult<E, A> =>
-  TE.tryCatch(decoder(response), (err) => FE.DecodeError((err as Error).message))
-
-const onFailure = <E, A>(response: Response, decoder: Decoder<E>): FetchResult<E, A> =>
+/**
+ * Takes a `FetchConfig` and uses the config object to download the contents of the specified
+ * `url` and decode the response body. The decoded response body is then parsed and the
+ * resulting list of `Token`s is returned.
+ *
+ * @category utils
+ * @since 0.0.1
+ */
+export const fetchTagsWithConfig: (
+  url: RequestInfo,
+  init?: RequestInit
+) => ReaderTaskEither<FetchConfig, string, ReadonlyArray<Token>> = (url, init) =>
   pipe(
-    TE.tryCatch(
+    RTE.ask<FetchConfig, string>(),
+    RTE.chainTaskEitherK((config) =>
       pipe(
-        decoder(response),
-        T.map((body) =>
-          FE.ResponseError(response.statusText, response.status, O.some(body), O.none)
-        )
-      ),
-      (err) =>
-        FE.ResponseError(
-          response.statusText,
-          response.status,
-          O.none,
-          O.some(FE.DecodeError((err as Error).message) as FE.DecodeError)
-        )
-    ),
-    TE.chain(TE.left)
+        TE.tryCatch(() => config.fetch(url, init), String),
+        TE.chain(config.decoder),
+        TE.map(fetchTagsRaw)
+      )
+    )
+  )
+
+/**
+ * Parses the contents downloaded from the specified `url` into a list of `Token`s.
+ *
+ * @category utils
+ * @since 0.0.1
+ */
+export const fetchTags: (
+  url: RequestInfo,
+  init?: RequestInit
+) => TaskEither<string, ReadonlyArray<Token>> = (url, init) =>
+  pipe(
+    TE.fromIOEither<string, GlobalFetch>(IOE.tryCatch(() => globalThis.fetch, String)),
+    TE.map((_fetch) => FetchConfig(_fetch, defaultDecoder)),
+    TE.chain(fetchTagsWithConfig(url, init))
+  )
+
+/**
+ * Executes the specified `scraper` on a raw HTML string.
+ *
+ * @category utils
+ * @since 0.0.1
+ */
+export const scrapeRaw = (html: string) => <A>(scraper: Scraper<A>): Either<string, A> =>
+  pipe(
+    fetchTagsRaw(html),
+    Scrape.scrape(scraper),
+    E.fromOption(() => 'Failed to scrape source')
+  )
+
+/**
+ * Takes a `FetchConfig` and uses the config object to download the contents of the specified
+ * `url` and decode the response body. The result of executing the specified `scraper` on the
+ * decoded contents is then returned.
+ *
+ * @category utils
+ * @since 0.0.1
+ */
+export const scrapeURLWithConfig: (
+  url: RequestInfo,
+  init?: RequestInit
+) => <A>(scraper: Scraper<A>) => ReaderTaskEither<FetchConfig, string, A> = (url, init) => (
+  scraper
+) =>
+  pipe(
+    RTE.ask<FetchConfig, string>(),
+    RTE.chain(() => fetchTagsWithConfig(url, init)),
+    RTE.chainEitherK(
+      flow(
+        Scrape.scrape(scraper),
+        E.fromOption(() => 'Failed to scrape source')
+      )
+    )
+  )
+
+/**
+ * Executes the specified `scraper` on the contents downloaded from the specified `url`.
+ *
+ * @category utils
+ * @since 0.0.1
+ */
+export const scrapeURL: (
+  url: RequestInfo,
+  init?: RequestInit
+) => <A>(scraper: Scraper<A>) => TaskEither<string, A> = (url, init) => (scraper) =>
+  pipe(
+    TE.fromIOEither<string, GlobalFetch>(IOE.tryCatch(() => globalThis.fetch, String)),
+    TE.map((_fetch) => FetchConfig(_fetch, defaultDecoder)),
+    TE.chain(scrapeURLWithConfig(url, init)(scraper))
   )

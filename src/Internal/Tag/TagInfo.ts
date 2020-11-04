@@ -102,33 +102,6 @@ const ordIndexedTagInfo: Ord<IndexedTagInfo> = pipe(
 )
 
 /**
- * Alters a value `V` at the key `K`, or absence thereof.
- *
- * Can be used to insert, delete, or update a value in a `ReadonlyMap`.
- */
-const alterMap = <K>(E: Eq.Eq<K>) => <V>(key: K, f: Endomorphism<Option<V>>) => (
-  map: ReadonlyMap<K, V>
-): ReadonlyMap<K, V> =>
-  pipe(
-    map,
-    RM.lookup(E)(key),
-    O.fold(
-      () =>
-        pipe(
-          f(O.none),
-          O.chain((a) => O.some(pipe(map, RM.insertAt(E)(key, a)))),
-          O.getOrElse(() => map)
-        ),
-      (a) =>
-        pipe(
-          f(O.some(a)),
-          O.chain((b) => pipe(map, RM.updateAt(E)(key, b))),
-          O.getOrElse(() => map)
-        )
-    )
-  )
-
-/**
  * Appends a token to the TagMap.
  */
 const appendToken = (x: IndexedToken): Endomorphism<Option<ReadonlyArray<IndexedToken>>> =>
@@ -261,4 +234,37 @@ export const annotateTags = (tokens: ReadonlyArray<Token>): ReadonlyArray<TagInf
     S.evaluate<TagMap>(RM.empty),
     RA.sort(ordIndexedTagInfo),
     RA.map(({ info }) => info)
+  )
+
+// -------------------------------------------------------------------------------------
+// utils
+// -------------------------------------------------------------------------------------
+
+/**
+ * Alters a value `V` at the key `K`, or absence thereof.
+ *
+ * Can be used to insert, delete, or update a value in a `ReadonlyMap`.
+ *
+ * @internal
+ */
+export const alterMap = <K>(E: Eq.Eq<K>) => <V>(key: K, f: Endomorphism<Option<V>>) => (
+  map: ReadonlyMap<K, V>
+): ReadonlyMap<K, V> =>
+  pipe(
+    map,
+    RM.lookup(E)(key),
+    O.fold(
+      () =>
+        pipe(
+          f(O.none),
+          O.chain((a) => O.some(pipe(map, RM.insertAt(E)(key, a)))),
+          O.getOrElse(() => map)
+        ),
+      (a) =>
+        pipe(
+          f(O.some(a)),
+          O.chain((b) => pipe(map, RM.updateAt(E)(key, b))),
+          O.getOrElse(() => map)
+        )
+    )
   )

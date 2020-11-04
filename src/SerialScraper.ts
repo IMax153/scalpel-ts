@@ -108,10 +108,9 @@ export * from './Internal/StateOption'
  * Serial scrapers operate on a zipper of `TagSpec`s that correspond to the root
  * nodes and siblings in a document.
  *
- * Access to the ziper is always performed in
- * move-the-read manner. For this reason, it is valid for the current focus of the
- * zipper to be just off either end of the list such that moving forward or backward
- * would result in reading the first or last node.
+ * Access to the ziper is always performed in a move-then-read manner. For this reason,
+ * it is valid for the current focus of the zipper to be just off either end of the list
+ * such that moving forward or backward would result in reading the first or last node.
  *
  * These valid focuses are expressed as `None` values at either end of the zipper,
  * since they are valid positions for the focus to pass over but not valid positions
@@ -212,7 +211,7 @@ const stepWith = (move: (zipper: SpecZipper) => Option<SpecZipper>) => <A>(
     SO.get<SpecZipper>(),
     SO.chainOptionK(move),
     SO.bindTo('next'),
-    SO.bind('focus', ({ next }) => SO.fromOption(next.focus)),
+    SO.bind('focus', ({ next }) => SO.fromOption(Z.extract(next))),
     SO.bind('value', ({ focus }) => SO.fromOption(scraper(focus))),
     SO.chain(({ next, value }) =>
       pipe(
@@ -228,33 +227,30 @@ const stepWith = (move: (zipper: SpecZipper) => Option<SpecZipper>) => <A>(
 const seekWith = (move: (specZipper: SpecZipper) => Option<SpecZipper>) => <A>(
   scraper: Scraper<A>
 ): SerialScraper<A> => {
-  const runScraper = (zipper: SpecZipper): SerialScraper<A> =>
-    pipe(
-      SO.get<SpecZipper>(),
-      SO.chain((curr) => SO.fromOption(curr.focus)),
-      SO.bindTo('focus'),
-      SO.bind('value', ({ focus }) => SO.fromOption(scraper(focus))),
-      SO.chain(({ value }) =>
-        pipe(
-          SO.put(zipper),
-          SO.map(() => value)
+  const runScraper: SerialScraper<A> = pipe(
+    SO.get<SpecZipper>(),
+    SO.chainOptionK(Z.extract),
+    SO.chainOptionK(scraper)
+  )
+
+  const go: SerialScraper<A> = pipe(
+    SO.get<SpecZipper>(),
+    SO.chainOptionK(move),
+    SO.chain((next) =>
+      pipe(
+        SO.put(next),
+        SO.chain(() => runScraper),
+        SO.alt(() =>
+          pipe(
+            SO.put(next),
+            SO.chain(() => go)
+          )
         )
       )
     )
+  )
 
-  const go = (prev: SpecZipper): SerialScraper<A> =>
-    pipe(
-      SO.get<SpecZipper>(),
-      SO.chainOptionK(() => move(prev)),
-      SO.chain((next) =>
-        pipe(
-          runScraper(next),
-          SO.alt(() => go(next))
-        )
-      )
-    )
-
-  return pipe(SO.get<SpecZipper>(), SO.chain(go))
+  return go
 }
 
 /**
@@ -267,26 +263,29 @@ const untilWith = (
   move: (specZipper: SpecZipper) => Option<SpecZipper>,
   appendNode: (spec: Option<TagSpec>) => (specZipper: SpecZipper) => SpecZipper
 ) => <A>(until: Scraper<A>) => <B>(scraper: SerialScraper<B>): SerialScraper<B> => {
-  const split = (prev: SpecZipper): SerialScraper<SpecZipper> =>
-    pipe(
-      SO.get<SpecZipper>(),
-      SO.chainOptionK(() => move(prev)),
-      SO.bindTo('next'),
-      SO.bind('spec', ({ next }) => SO.fromOption(next.focus)),
-      SO.chain(({ next, spec }) =>
-        pipe(
-          SO.get<SpecZipper>(),
-          SO.chainOptionK(() => until(spec)),
-          SO.map(() => Z.of<Option<TagSpec>>(O.none)),
-          SO.alt(() => pipe(split(next), SO.map(appendNode(O.some(spec)))))
+  const split: SerialScraper<SpecZipper> = pipe(
+    SO.get<SpecZipper>(),
+    SO.chainOptionK(move),
+    SO.bindTo('next'),
+    SO.bind('focus', ({ next }) => SO.fromOption(Z.extract(next))),
+    SO.chain(({ next, focus }) =>
+      pipe(
+        SO.fromOption<SpecZipper, A>(until(focus)),
+        SO.map(() => Z.of<Option<TagSpec>>(O.none)),
+        SO.alt(() =>
+          pipe(
+            SO.put(next),
+            SO.chain(() => split),
+            SO.map(appendNode(O.some(focus)))
+          )
         )
-      ),
-      SO.alt(() => SO.of(Z.of<Option<TagSpec>>(O.none)))
-    )
+      )
+    ),
+    SO.alt(() => SO.of(Z.of<Option<TagSpec>>(O.none)))
+  )
 
   return pipe(
-    SO.get<SpecZipper>(),
-    SO.chain(split),
+    split,
     SO.chainOptionK((inner) => pipe(scraper, SO.evaluate(appendNode(O.none)(inner))))
   )
 }
