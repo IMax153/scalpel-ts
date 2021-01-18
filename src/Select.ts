@@ -456,8 +456,26 @@ const shrinkSpecWith = (spec: TagSpec, parent: Tree<TagSpan>): TagSpec => {
     spec.tags.slice(start, end + 1)
   )
 }
+
 const updateHierarchy = (curr: TagSpec, hierarchy: TagForest): TagSpec =>
   TS.TagSpec(curr.context, hierarchy, curr.tags)
+
+/**
+ * @internal
+ */
+export const liftSiblings = (acc: TagForest) => (
+  start: number,
+  end: number
+): F.Endomorphism<TagForest> =>
+  A.foldLeft(
+    () => acc,
+    (t, ts) =>
+      start < t.value.start && t.value.end < end
+        ? F.pipe(ts, liftSiblings(acc)(start, end), A.cons(t))
+        : end < t.value.start || t.value.end < start
+        ? F.pipe(ts, liftSiblings(acc)(start, end))
+        : F.pipe(ts, liftSiblings(acc)(start, end), liftSiblings(t.forest)(start, end))
+  )
 
 const selectNodes = (selectors: Selector, curr: TagSpec, root: TagSpec) => (
   acc: ReadonlyArray<TagSpec>
@@ -513,18 +531,7 @@ const selectNodes = (selectors: Selector, curr: TagSpec, root: TagSpec) => (
 
               // In order to match <c>, it must be lifted out of <b>'s subforest when
               // matching <a>.
-              const liftSiblings = (acc: TagForest): F.Endomorphism<TagForest> =>
-                A.foldLeft(
-                  () => acc,
-                  (t, ts) =>
-                    start < t.value.start && t.value.end < end
-                      ? F.pipe(ts, liftSiblings(acc), A.cons(t))
-                      : end < t.value.start || t.value.end < start
-                      ? F.pipe(ts, liftSiblings(acc))
-                      : F.pipe(ts, liftSiblings(acc), liftSiblings(t.forest))
-                )
-
-              const siblings = F.pipe(fs, liftSiblings(A.empty))
+              const siblings = F.pipe(fs, liftSiblings(A.empty)(start, end))
 
               return F.pipe(
                 nodeMatches(n, curr.tags[start], curr, root),
