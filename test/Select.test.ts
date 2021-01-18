@@ -3,9 +3,12 @@ import * as E from 'fp-ts/Either'
 import * as Eq from 'fp-ts/Eq'
 import * as O from 'fp-ts/Option'
 import * as RA from 'fp-ts/ReadonlyArray'
+import * as Tree from 'fp-ts/Tree'
 import { pipe } from 'fp-ts/function'
 
+import type { TagForest } from '../src/Internal/Tag/TagForest'
 import * as T from '../src/Internal/Html/Tokenizer'
+import * as TF from '../src/Internal/Tag/TagForest'
 import * as TS from '../src/Internal/Tag/TagSpec'
 import * as MR from '../src/Internal/MatchResult'
 import * as Scrape from '../src/Scraper'
@@ -428,6 +431,32 @@ describe('Select', () => {
           Select.checkSettings(Select.SelectSettings(O.some(1)), curr, root),
           MR.MatchOk
         )
+      })
+    })
+
+    describe('liftSiblings', () => {
+      it('should return an empty array if no valid siblings are found within the parent node', () => {
+        const tagForest: TagForest = [Tree.make(TF.TagSpan(4, 10), [])]
+        assert.deepStrictEqual(Select.liftSiblings([])(3, 9)(tagForest), RA.empty)
+      })
+
+      it('should lift valid siblings out of the span of the current parent node', () => {
+        const tagForest: TagForest = [Tree.make(TF.TagSpan(5, 6), [])]
+
+        assert.deepStrictEqual(Select.liftSiblings([])(3, 9)(tagForest), [
+          Tree.make(TF.TagSpan(5, 6))
+        ])
+      })
+
+      it('should lift valid siblings out of child subforests within the current parent node', () => {
+        const tagForest: TagForest = [
+          Tree.make(TF.TagSpan(4, 10), [Tree.make(TF.TagSpan(5, 6)), Tree.make(TF.TagSpan(7, 8))])
+        ]
+
+        assert.deepStrictEqual(Select.liftSiblings([])(3, 9)(tagForest), [
+          Tree.make(TF.TagSpan(5, 6)),
+          Tree.make(TF.TagSpan(7, 8))
+        ])
       })
     })
   })
