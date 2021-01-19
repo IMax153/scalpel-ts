@@ -16,13 +16,13 @@ import { absurd, flow, pipe, Endomorphism, identity } from 'fp-ts/function'
 // -------------------------------------------------------------------------------------
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export type Token = TagOpen | TagClose | Text | Comment
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface TagOpen {
@@ -32,7 +32,7 @@ export interface TagOpen {
 }
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface TagClose {
@@ -41,7 +41,7 @@ export interface TagClose {
 }
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface Text {
@@ -50,7 +50,7 @@ export interface Text {
 }
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface Comment {
@@ -59,7 +59,7 @@ export interface Comment {
 }
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface Attribute {
@@ -72,7 +72,7 @@ export interface Attribute {
 // -------------------------------------------------------------------------------------
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const TagOpen = (name: string, attributes: ReadonlyArray<Attribute>): Token => ({
@@ -82,7 +82,7 @@ export const TagOpen = (name: string, attributes: ReadonlyArray<Attribute>): Tok
 })
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const TagClose = (name: string): Token => ({
@@ -91,7 +91,7 @@ export const TagClose = (name: string): Token => ({
 })
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const Text = (text: string): Token => ({
@@ -100,7 +100,7 @@ export const Text = (text: string): Token => ({
 })
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const Comment = (comment: string): Token => ({
@@ -109,7 +109,7 @@ export const Comment = (comment: string): Token => ({
 })
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const Attribute = (key: string, value: string): Attribute => ({
@@ -122,7 +122,7 @@ export const Attribute = (key: string, value: string): Attribute => ({
 // -------------------------------------------------------------------------------------
 
 /**
- * @category destructors
+ * @internal
  * @since 0.0.1
  */
 export const fold = <R>(patterns: {
@@ -156,6 +156,7 @@ export const fold = <R>(patterns: {
  * Reduces the complexity of a tokenized HTML document by dropping empty `Text` tokens.
  *
  * @internal
+ * @since 0.0.1
  */
 export const canonicalizeTokens: Endomorphism<ReadonlyArray<Token>> = flow(
   RA.filterMap((x) =>
@@ -176,7 +177,7 @@ export const canonicalizeTokens: Endomorphism<ReadonlyArray<Token>> = flow(
 // -------------------------------------------------------------------------------------
 
 /**
- * @category parsers
+ * @internal
  * @since 0.0.1
  */
 export const parse = (source: string): ReadonlyArray<Token> => {
@@ -249,7 +250,7 @@ const showAttribute: Show<Attribute> = {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const showToken: Show<Token> = {

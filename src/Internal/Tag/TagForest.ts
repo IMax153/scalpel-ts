@@ -25,7 +25,7 @@ import * as T from '../Html/Tokenizer'
  * the token stream appear earlier in the list of nodes, and that a given node
  * is completely within the span of its parent node.
  *
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export type TagForest = Forest<TagSpan>
@@ -35,7 +35,7 @@ export type TagForest = Forest<TagSpan>
  * and the index of the closing tag within the token stream. If there is not a
  * closing tag, the closing tag is equal to the opening tag.
  *
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface TagSpan {
@@ -48,7 +48,7 @@ export interface TagSpan {
 // -------------------------------------------------------------------------------------
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const TagSpan = (start: number, end: number): TagSpan => ({
@@ -108,7 +108,7 @@ const fixTree: Endomorphism<TagForest> = A.foldLeft(
  * The tree is organized such that for any node `n` in the tree, the parent node `x`
  * of `n` is the smallest span that completely encapsulates the span of `n`.
  *
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const fromTagInfo = (tokenInfo: ReadonlyArray<TagInfo>): TagForest => {

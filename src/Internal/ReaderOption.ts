@@ -21,7 +21,7 @@ import { identity, flow, not, pipe, Lazy, Predicate, Refinement } from 'fp-ts/fu
 // -------------------------------------------------------------------------------------
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface ReaderOption<R, A> {
@@ -33,31 +33,31 @@ export interface ReaderOption<R, A> {
 // -------------------------------------------------------------------------------------
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const none: ReaderOption<any, never> = R.of(O.none)
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const some: <R, A>(a: A) => ReaderOption<R, A> = flow(O.some, R.of)
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const ask: <R>() => ReaderOption<R, R> = () => O.of
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const asks: <R, A>(f: (r: R) => A) => ReaderOption<R, A> = (f) => flow(f, O.some)
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const fromOption: <R, A>(ma: Option<A>) => ReaderOption<R, A> =
@@ -65,7 +65,7 @@ export const fromOption: <R, A>(ma: Option<A>) => ReaderOption<R, A> =
   R.of
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const fromReader: <R, A>(ma: Reader<R, A>) => ReaderOption<R, A> =
@@ -73,7 +73,7 @@ export const fromReader: <R, A>(ma: Reader<R, A>) => ReaderOption<R, A> =
   R.map(O.of)
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const fromPredicate: {
@@ -86,7 +86,7 @@ export const fromPredicate: {
 // -------------------------------------------------------------------------------------
 
 /**
- * @category destructors
+ * @internal
  * @since 0.0.1
  */
 export const fold: <R, A, B>(
@@ -97,7 +97,7 @@ export const fold: <R, A, B>(
   flow(O.fold, R.chain)
 
 /**
- * @category destructors
+ * @internal
  * @since 0.0.1
  */
 export const getOrElseW = <R, B>(onNone: Lazy<Reader<R, B>>) => <Q, A>(
@@ -105,7 +105,7 @@ export const getOrElseW = <R, B>(onNone: Lazy<Reader<R, B>>) => <Q, A>(
 ): Reader<Q & R, A | B> => pipe(ma, R.chain(O.fold<A, R.Reader<Q & R, A | B>>(onNone, R.of)))
 
 /**
- * @category destructors
+ * @internal
  * @since 0.0.1
  */
 export const getOrElse: <R, A>(
@@ -117,7 +117,7 @@ export const getOrElse: <R, A>(
 // -------------------------------------------------------------------------------------
 
 /**
- * @category combinators
+ * @internal
  * @since 0.0.1
  */
 export const fromOptionK: <A extends ReadonlyArray<unknown>, B>(
@@ -125,7 +125,7 @@ export const fromOptionK: <A extends ReadonlyArray<unknown>, B>(
 ) => <R>(...a: A) => ReaderOption<R, B> = (f) => (...a) => fromOption(f(...a))
 
 /**
- * @category combinators
+ * @internal
  * @since 0.0.1
  */
 export const chainOptionK: <A, B>(
@@ -154,7 +154,7 @@ const partitionMap_: Filterable2<URI>['partitionMap'] = (fa, f) => pipe(fa, part
 // -------------------------------------------------------------------------------------
 
 /**
- * @category Functor
+ * @internal
  * @since 0.0.1
  */
 export const map: <A, B>(f: (a: A) => B) => <R>(fa: ReaderOption<R, A>) => ReaderOption<R, B> = (
@@ -162,7 +162,7 @@ export const map: <A, B>(f: (a: A) => B) => <R>(fa: ReaderOption<R, A>) => Reade
 ) => R.map(O.map(f))
 
 /**
- * @category Apply
+ * @internal
  * @since 0.0.1
  */
 export const ap = <R, A>(
@@ -174,7 +174,7 @@ export const ap = <R, A>(
   )
 
 /**
- * @category Apply
+ * @internal
  * @since 0.1.18
  */
 export const apFirst = <R, B>(
@@ -186,7 +186,7 @@ export const apFirst = <R, B>(
   )
 
 /**
- * @category Apply
+ * @internal
  * @since 0.1.18
  */
 export const apSecond = <R, B>(
@@ -198,7 +198,7 @@ export const apSecond = <R, B>(
   )
 
 /**
- * @category Monad
+ * @internal
  * @since 0.0.1
  */
 export const chain = <R, A, B>(f: (a: A) => ReaderOption<R, B>) => (
@@ -206,13 +206,13 @@ export const chain = <R, A, B>(f: (a: A) => ReaderOption<R, B>) => (
 ): ReaderOption<R, B> => pipe(ma, R.chain(O.fold<A, ReaderOption<R, B>>(() => none, f)))
 
 /**
- * @category Applicative
+ * @internal
  * @since 0.0.1
  */
 export const of: Applicative2<URI>['of'] = some
 
 /**
- * @category Monad
+ * @internal
  * @since 0.0.1
  */
 export const chainFirst: <R, A, B>(
@@ -226,7 +226,7 @@ export const chainFirst: <R, A, B>(
   )
 
 /**
- * @category Monad
+ * @internal
  * @since 0.0.1
  */
 export const flatten: <R, A>(mma: ReaderOption<R, ReaderOption<R, A>>) => ReaderOption<R, A> =
@@ -234,7 +234,7 @@ export const flatten: <R, A>(mma: ReaderOption<R, ReaderOption<R, A>>) => Reader
   chain(identity)
 
 /**
- * @category Alternative
+ * @internal
  * @since 0.0.1
  */
 export const alt: <R, A>(
@@ -242,13 +242,13 @@ export const alt: <R, A>(
 ) => (fa: ReaderOption<R, A>) => ReaderOption<R, A> = (that) => R.chain(O.fold(that, some))
 
 /**
- * @category Alternative
+ * @internal
  * @since 0.0.1
  */
 export const zero: Alternative2<URI>['zero'] = () => none
 
 /**
- * @category Compactable
+ * @internal
  * @since 0.0.1
  */
 export const compact: <R, A>(fa: ReaderOption<R, Option<A>>) => ReaderOption<R, A> = R.map(
@@ -256,7 +256,7 @@ export const compact: <R, A>(fa: ReaderOption<R, Option<A>>) => ReaderOption<R, 
 )
 
 /**
- * @category Compactable
+ * @internal
  * @since 0.0.1
  */
 export const separate: <R, A, B>(
@@ -267,7 +267,7 @@ export const separate: <R, A, B>(
   return { left, right }
 }
 /**
- * @category Filterable
+ * @internal
  * @since 0.0.1
  */
 export const filter: {
@@ -277,7 +277,7 @@ export const filter: {
   pipe(fa, R.map(O.filter(f)))
 
 /**
- * @category Filterable
+ * @internal
  * @since 0.0.1
  */
 export const filterMap: <R, A, B>(
@@ -285,7 +285,7 @@ export const filterMap: <R, A, B>(
 ) => (fa: ReaderOption<R, A>) => ReaderOption<R, B> = (f) => (fa) => pipe(fa, R.map(O.filterMap(f)))
 
 /**
- * @category Filterable
+ * @internal
  * @since 0.0.1
  */
 export const partition: {
@@ -304,7 +304,7 @@ export const partition: {
 }
 
 /**
- * @category Filterable
+ * @internal
  * @since 0.0.1
  */
 export const partitionMap: <A, B, C>(
@@ -322,13 +322,13 @@ export const partitionMap: <A, B, C>(
 // -------------------------------------------------------------------------------------
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const URI = 'ReaderOption'
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export type URI = typeof URI
@@ -340,7 +340,7 @@ declare module 'fp-ts/HKT' {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const Functor: Functor2<URI> = {
@@ -349,7 +349,7 @@ export const Functor: Functor2<URI> = {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const Apply: Apply2<URI> = {
@@ -359,7 +359,7 @@ export const Apply: Apply2<URI> = {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const Applicative: Applicative2<URI> = {
@@ -370,7 +370,7 @@ export const Applicative: Applicative2<URI> = {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const Monad: Monad2<URI> = {
@@ -382,7 +382,7 @@ export const Monad: Monad2<URI> = {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const Alt: Alt2<URI> = {
@@ -392,7 +392,7 @@ export const Alt: Alt2<URI> = {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const Alternative: Alternative2<URI> = {
@@ -405,7 +405,7 @@ export const Alternative: Alternative2<URI> = {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const Compactable: Compactable2<URI> = {
@@ -415,7 +415,7 @@ export const Compactable: Compactable2<URI> = {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const Filterable: Filterable2<URI> = {
@@ -434,7 +434,7 @@ export const Filterable: Filterable2<URI> = {
 // -------------------------------------------------------------------------------------
 
 /**
- * @category do notation
+ * @internal notation
  * @since 0.0.1
  */
 export const bindTo = <N extends string>(
@@ -443,7 +443,7 @@ export const bindTo = <N extends string>(
   map((b) => ({ [name]: b } as any))
 
 /**
- * @category do notation
+ * @internal notation
  * @since 0.0.1
  */
 export const bind = <N extends string, R, A, B>(

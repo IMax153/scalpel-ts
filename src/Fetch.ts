@@ -1,15 +1,15 @@
 /**
- * Note
- * ----
+ * **Note**
+ *
  * The default behaviour of `scrapeURL` and `fetchTags` is to use the `fetch` implementation
  * provided by the `globalThis` object to download the contents of a remote url. If executing
  * either of these functions in an environment where `globalThis` is undefined, then the
- * `globalThis` object and its `fetch` implementation should be polyfilled.
+ * `globalThis` object and its `fetch` implementation should be polyfilled. Similarly, if
+ * `globalThis` is defined for your environment, but `globalThis.fetch` is not, then the
+ * `fetch` implementation for `globalThis` should be polyfilled.
  *
- * Similarly, if `globalThis` is defined for your environment, but `globalThis.fetch` is not,
- * then the `fetch` implementation for `globalThis` should be polyfilled. Alternatively, an
- * explicit configuration for `fetch` can be provided using the `scrapeURLWithConfig` and
- * `fetchTagsWithConfig` functions.
+ * Alternatively, an explicit configuration for `fetch` can be provided using the
+ * `scrapeURLWithConfig` and/or `fetchTagsWithConfig` functions.
  *
  * @since 0.0.1
  */

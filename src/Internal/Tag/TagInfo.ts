@@ -46,7 +46,7 @@ import * as T from '../Html/Tokenizer'
  * Represents a token and its pre-computed metadata which can be accessed in tight
  * inner loops while scraping.
  *
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface TagInfo {
@@ -66,7 +66,7 @@ export interface TagInfo {
 // -------------------------------------------------------------------------------------
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const TagInfo = (token: Token, closeOffset: Option<number>): TagInfo => ({
@@ -222,7 +222,7 @@ const traverseStateWithIndex = <A, S, B>(f: (i: number, a: A) => State<S, B>) =>
 /**
  * Annotates each parsed tag with the the offset to its closing tag, if present.
  *
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const annotateTags = (tokens: ReadonlyArray<Token>): ReadonlyArray<TagInfo> =>
@@ -246,6 +246,7 @@ export const annotateTags = (tokens: ReadonlyArray<Token>): ReadonlyArray<TagInf
  * Can be used to insert, delete, or update a value in a `ReadonlyMap`.
  *
  * @internal
+ * @since 0.0.1
  */
 export const alterMap = <K>(E: Eq.Eq<K>) => <V>(key: K, f: Endomorphism<Option<V>>) => (
   map: ReadonlyMap<K, V>

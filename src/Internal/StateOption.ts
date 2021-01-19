@@ -17,7 +17,7 @@ import { flow, identity, pipe, Lazy } from 'fp-ts/function'
 // -------------------------------------------------------------------------------------
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface StateOption<S, A> {
@@ -29,44 +29,44 @@ export interface StateOption<S, A> {
 // -------------------------------------------------------------------------------------
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const none: <S, A = never>() => StateOption<S, A> = () => () => O.none
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const some: <S, A>(a: A) => StateOption<S, A> = (a) => (s) => O.some([a, s])
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const get: <S>() => StateOption<S, S> = () => (s) => O.some([s, s])
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const put: <S>(s: S) => StateOption<S, void> = (s) => () => O.some([undefined, s])
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const modify: <S>(f: (s: S) => S) => StateOption<S, void> = (f) => (s) =>
   O.some([undefined, f(s)])
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const gets: <S, A>(f: (s: S) => A) => StateOption<S, A> = (f) => (s) => O.some([f(s), s])
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const fromOption: <S, A>(ma: Option<A>) => StateOption<S, A> =
@@ -74,7 +74,7 @@ export const fromOption: <S, A>(ma: Option<A>) => StateOption<S, A> =
   O.fold(none, some) as any
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const fromState: <S, A>(fa: State<S, A>) => StateOption<S, A> = (fa) => (s) => O.some(fa(s))
@@ -84,7 +84,7 @@ export const fromState: <S, A>(fa: State<S, A>) => StateOption<S, A> = (fa) => (
 // -------------------------------------------------------------------------------------
 
 /**
- * @category combinators
+ * @internal
  * @since 0.0.1
  */
 export const fromOptionK: <A extends ReadonlyArray<unknown>, B>(
@@ -92,7 +92,7 @@ export const fromOptionK: <A extends ReadonlyArray<unknown>, B>(
 ) => <S>(...a: A) => StateOption<S, B> = (f) => (...a) => fromOption(f(...a))
 
 /**
- * @category combinators
+ * @internal
  * @since 0.0.1
  */
 export const chainOptionK: <A, B>(
@@ -113,7 +113,7 @@ const alt_: Alternative2<URI>['alt'] = (fa, that) => pipe(fa, alt(that))
 // -------------------------------------------------------------------------------------
 
 /**
- * @category Functor
+ * @internal
  * @since 0.0.1
  */
 export const map = <A, B>(f: (a: A) => B) => <S>(fa: StateOption<S, A>): StateOption<S, B> => (
@@ -125,7 +125,7 @@ export const map = <A, B>(f: (a: A) => B) => <S>(fa: StateOption<S, A>): StateOp
   )
 
 /**
- * @category Apply
+ * @internal
  * @since 0.0.1
  */
 export const ap = <S, A>(fa: StateOption<S, A>) => <B>(
@@ -142,7 +142,7 @@ export const ap = <S, A>(fa: StateOption<S, A>) => <B>(
   )
 
 /**
- * @category Apply
+ * @internal
  * @since 0.1.18
  */
 export const apFirst = <S, B>(
@@ -154,7 +154,7 @@ export const apFirst = <S, B>(
   )
 
 /**
- * @category Apply
+ * @internal
  * @since 0.1.18
  */
 export const apSecond = <S, B>(
@@ -166,7 +166,7 @@ export const apSecond = <S, B>(
   )
 
 /**
- * @category Monad
+ * @internal
  * @since 0.0.1
  */
 export const chain = <S, A, B>(f: (a: A) => StateOption<S, B>) => (
@@ -178,13 +178,13 @@ export const chain = <S, A, B>(f: (a: A) => StateOption<S, B>) => (
   )
 
 /**
- * @category Applicative
+ * @internal
  * @since 0.0.1
  */
 export const of: Applicative2<URI>['of'] = some
 
 /**
- * @category Monad
+ * @internal
  * @since 0.0.1
  */
 export const chainFirst: <R, A, B>(
@@ -198,7 +198,7 @@ export const chainFirst: <R, A, B>(
   )
 
 /**
- * @category Monad
+ * @internal
  * @since 0.0.1
  */
 export const flatten: <R, A>(mma: StateOption<R, StateOption<R, A>>) => StateOption<R, A> =
@@ -206,7 +206,7 @@ export const flatten: <R, A>(mma: StateOption<R, StateOption<R, A>>) => StateOpt
   chain(identity)
 
 /**
- * @category Alternative
+ * @internal
  * @since 0.0.1
  */
 export const alt: <R, A>(
@@ -218,7 +218,7 @@ export const alt: <R, A>(
   )
 
 /**
- * @category Alternative
+ * @internal
  * @since 0.0.1
  */
 export const zero: Alternative2<URI>['zero'] = none
@@ -228,13 +228,13 @@ export const zero: Alternative2<URI>['zero'] = none
 // -------------------------------------------------------------------------------------
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const URI = 'StateOption'
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export type URI = typeof URI
@@ -246,7 +246,7 @@ declare module 'fp-ts/HKT' {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const Functor: Functor2<URI> = {
@@ -255,7 +255,7 @@ export const Functor: Functor2<URI> = {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const Apply: Apply2<URI> = {
@@ -265,7 +265,7 @@ export const Apply: Apply2<URI> = {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const Applicative: Applicative2<URI> = {
@@ -276,7 +276,7 @@ export const Applicative: Applicative2<URI> = {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const Monad: Monad2<URI> = {
@@ -288,7 +288,7 @@ export const Monad: Monad2<URI> = {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const Alt: Alt2<URI> = {
@@ -298,7 +298,7 @@ export const Alt: Alt2<URI> = {
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const Alternative: Alternative2<URI> = {
@@ -315,7 +315,7 @@ export const Alternative: Alternative2<URI> = {
 // -------------------------------------------------------------------------------------
 
 /**
- * @category utils
+ * @internal
  * @since 0.0.1
  */
 export const evaluate: <S>(s: S) => <A>(ma: StateOption<S, A>) => Option<A> = (s) => (ma) =>
@@ -325,7 +325,7 @@ export const evaluate: <S>(s: S) => <A>(ma: StateOption<S, A>) => Option<A> = (s
   )
 
 /**
- * @category utils
+ * @internal
  * @since 0.0.1
  */
 export const execute: <S>(s: S) => <A>(ma: StateOption<S, A>) => Option<S> = (s) => (ma) =>
@@ -339,7 +339,7 @@ export const execute: <S>(s: S) => <A>(ma: StateOption<S, A>) => Option<S> = (s)
 // -------------------------------------------------------------------------------------
 
 /**
- * @category do notation
+ * @internal notation
  * @since 0.0.1
  */
 export const bindTo = <N extends string>(
@@ -348,7 +348,7 @@ export const bindTo = <N extends string>(
   map((b) => ({ [name]: b } as any))
 
 /**
- * @category do notation
+ * @internal notation
  * @since 0.0.1
  */
 export const bind = <N extends string, R, A, B>(

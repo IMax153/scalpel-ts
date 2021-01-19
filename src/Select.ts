@@ -462,6 +462,7 @@ const updateHierarchy = (curr: TagSpec, hierarchy: TagForest): TagSpec =>
 
 /**
  * @internal
+ * @since 0.0.1
  */
 export const liftSiblings = (acc: TagForest) => (
   start: number,

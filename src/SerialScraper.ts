@@ -1,8 +1,8 @@
 /**
  * A `SerialScraper` allows for the application of a `Scraper` to a sequence of
- * sibling nodes. THis allows for use cases like targeting the sibling of a node,
- * or extracting a sequence of sibling nodes (e.g. paragraphs (`<p />`) under a
- * header (`<h2 />`)).
+ * sibling nodes. This allows for use cases like targeting the sibling of a node,
+ * or extracting a sequence of sibling nodes (e.g. paragraphs (`<p/>`) under a
+ * header (`<h2/>`)).
  *
  * Conceptually, serial scrapers operate on a sequence of tags that correspond
  * to the immediate children of the currently focused node. For example, given
@@ -20,50 +20,43 @@
  * </article>
  * ```
  *
- * A serial scraper that visits the header and paragraph nodes can be executed
- * with the following:
+ * Each `SerialScraper` primitive follows the pattern of first moving the focus
+ * backward or forward, and then extracting the content from the new focus.
+ * Attempting to extract content from beyond the end of the sequence causes the
+ * scraper to fail.
+ *
+ * To complete the above example, a serial scraper that visits and extracts the
+ * content of the header and paragraph nodes can be executed with the following...
  *
  * ```typescript
  * import { pipe } from 'fp-ts/function'
- * import * as S from 'scalpel-ts/Scraper'
+ * import * as Scrape from 'scalpel-ts/Scraper'
  * import * as Select from 'scalpel-ts/Select'
  * import * as Serial from 'scalpel-ts/SerialScraper'
  *
  * pipe(
- *   Serial.seekNext(S.text(Select.tag('h1'))),
+ *   Serial.seekNext(Scrape.text(Select.tag('h1'))),
  *   Serial.bindTo('title'),
  *   Serial.bind('sections', () =>
  *     pipe(
- *       Serial.seekNext(S.text(Select.tag('h2'))),
+ *       Serial.seekNext(Scrape.text(Select.tag('h2'))),
  *       Serial.bindTo('section'),
  *       Serial.bind('ps', () =>
  *         pipe(
- *           Serial.seekNext(S.text(Select.tag('p'))),
+ *           Serial.seekNext(Scrape.text(Select.tag('p'))),
  *           Serial.repeat,
- *           Serial.untilNext(S.matches(Select.tag('h2')))
+ *           Serial.untilNext(Scrape.matches(Select.tag('h2')))
  *         )
  *       ),
  *       Serial.repeat
  *     )
  *   ),
  *   Serial.inSerial,
- *   S.chroot(Select.tag('article'))
+ *   Scrape.chroot(Select.tag('article'))
  * )
  * ```
  *
- * Each `SerialScraper` primitive follows the pattern of first moving the focus
- * backward or forward, and then extracting the content from the new focus.
- * Attempting to extract content from beyond the end of the sequence causes the
- * scraper to fail.
- *
- * To complete the above example, the article's structure and content can be
- * extracted with the following code:
- *
- * ```typescript
- *
- * ```
- *
- * While will evaluate to:
+ * ...which will evaluate to:
  *
  * ```sh
  * {

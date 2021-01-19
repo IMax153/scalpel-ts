@@ -16,7 +16,7 @@ import * as I from './TagInfo'
  * Represents a structure containing the parsed token information, the
  * hierarchy of the document, and the context of the selection.
  *
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface TagSpec {
@@ -30,7 +30,7 @@ export interface TagSpec {
 // -------------------------------------------------------------------------------------
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const TagSpec = (
@@ -46,7 +46,7 @@ export const TagSpec = (
 /**
  * Constructs a `TagSpec` from a stream of tokens parsed by the HTML parser.
  *
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const tagsToSpec = (tokens: ReadonlyArray<Token>): TagSpec => {
