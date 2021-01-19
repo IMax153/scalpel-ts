@@ -16,7 +16,7 @@ import * as I from './TagInfo'
  * Represents a structure containing the parsed token information, the
  * hierarchy of the document, and the context of the selection.
  *
- * @internal
+ * @category model
  * @since 0.0.1
  */
 export interface TagSpec {

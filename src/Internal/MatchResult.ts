@@ -12,25 +12,25 @@ import { absurd } from 'fp-ts/function'
 /**
  * Represents the result of a `Selection`.
  *
- * @internal
+ * @category model
  * @since 0.0.1
  */
 export type MatchResult = MatchOk | MatchFail | MatchCull
 
 /**
- * @internal
+ * @category model
  * @since 0.0.1
  */
 export type MatchOk = 'MatchOk'
 
 /**
- * @internal
+ * @category model
  * @since 0.0.1
  */
 export type MatchFail = 'MatchFail'
 
 /**
- * @internal
+ * @category model
  * @since 0.0.1
  */
 export type MatchCull = 'MatchCull'

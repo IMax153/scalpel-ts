@@ -16,13 +16,13 @@ import { absurd, flow, pipe, Endomorphism, identity } from 'fp-ts/function'
 // -------------------------------------------------------------------------------------
 
 /**
- * @internal
+ * @category model
  * @since 0.0.1
  */
 export type Token = TagOpen | TagClose | Text | Comment
 
 /**
- * @internal
+ * @category model
  * @since 0.0.1
  */
 export interface TagOpen {
@@ -32,7 +32,7 @@ export interface TagOpen {
 }
 
 /**
- * @internal
+ * @category model
  * @since 0.0.1
  */
 export interface TagClose {
@@ -41,7 +41,7 @@ export interface TagClose {
 }
 
 /**
- * @internal
+ * @category model
  * @since 0.0.1
  */
 export interface Text {
@@ -50,7 +50,7 @@ export interface Text {
 }
 
 /**
- * @internal
+ * @category model
  * @since 0.0.1
  */
 export interface Comment {
@@ -59,7 +59,7 @@ export interface Comment {
 }
 
 /**
- * @internal
+ * @category model
  * @since 0.0.1
  */
 export interface Attribute {

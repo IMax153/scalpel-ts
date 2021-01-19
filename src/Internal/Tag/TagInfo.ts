@@ -46,7 +46,7 @@ import * as T from '../Html/Tokenizer'
  * Represents a token and its pre-computed metadata which can be accessed in tight
  * inner loops while scraping.
  *
- * @internal
+ * @category model
  * @since 0.0.1
  */
 export interface TagInfo {

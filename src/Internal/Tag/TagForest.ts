@@ -25,7 +25,7 @@ import * as T from '../Html/Tokenizer'
  * the token stream appear earlier in the list of nodes, and that a given node
  * is completely within the span of its parent node.
  *
- * @internal
+ * @category model
  * @since 0.0.1
  */
 export type TagForest = Forest<TagSpan>
@@ -35,7 +35,7 @@ export type TagForest = Forest<TagSpan>
  * and the index of the closing tag within the token stream. If there is not a
  * closing tag, the closing tag is equal to the opening tag.
  *
- * @internal
+ * @category model
  * @since 0.0.1
  */
 export interface TagSpan {
