@@ -1,15 +1,39 @@
 {
-  "name": "project-template",
+  "name": "scalpel-ts",
   "version": "0.0.1",
-  "main": "index.js",
   "author": "Maxwell Brown <maxwellbrown1990@gmail.com> (https://github.com/IMax153)",
+  "description": "A porting of Haskell's scalpel web scraper to TypeScript",
   "license": "MIT",
-  "private": true,
+  "main": "lib/index.js",
+  "module": "es6/index.js",
+  "typings": "lib/index.d.ts",
+  "sideEffects": false,
+  "files": [
+    "lib",
+    "es6"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homepage": "https://github.com/IMax153/scalpel-ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IMax153/scalpel-ts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/IMax153/scalpel-ts/issues"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "dev": "ts-node -O '{\"module\": \"commonjs\"}' src",
-    "test": "jest",
-    "test:watch": "jest --watchAll"
+    "build": "tsc -p ./tsconfig.build.json && tsc -p ./tsconfig.build-es6.json && import-path-rewrite",
+    "postbuild": "prettier --write \"./{lib,es6}/**/*.ts\"",
+    "import-path-rewrite": "import-path-rewrite",
+    "lint": "eslint",
+    "jest": "jest --ci",
+    "jest-clear-cache": "jest --clearCache",
+    "test": "yarn lint && yarn prettier && yarn jest-clear-cache && yarn jest",
+    "test:watch": "jest --watchAll",
+    "prettier": "prettier --list-different \"./{src,test,examples}/**/*.ts\"",
+    "prepublish": "yarn build"
   },
   "dependencies": {
     "fp-ts": "^2.8.5",
@@ -29,10 +53,10 @@
     "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-jest": "^24.0.2",
     "eslint-plugin-prettier": "^3.1.4",
-    "fast-check": "^2.6.0",
-    "fp-ts-laws": "^0.3.0",
+    "fast-check": "^2.11.0",
     "glob": "^7.1.6",
     "husky": "^4.3.0",
+    "import-path-rewrite": "github:gcanti/import-path-rewrite",
     "jest": "^26.4.2",
     "jest-fetch-mock": "^3.0.3",
     "lint-staged": "^10.4.0",
