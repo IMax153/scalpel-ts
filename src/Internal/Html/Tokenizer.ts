@@ -72,7 +72,7 @@ export interface Attribute {
 // -------------------------------------------------------------------------------------
 
 /**
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const TagOpen = (name: string, attributes: ReadonlyArray<Attribute>): Token => ({
@@ -82,7 +82,7 @@ export const TagOpen = (name: string, attributes: ReadonlyArray<Attribute>): Tok
 })
 
 /**
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const TagClose = (name: string): Token => ({
@@ -91,7 +91,7 @@ export const TagClose = (name: string): Token => ({
 })
 
 /**
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const Text = (text: string): Token => ({
@@ -100,7 +100,7 @@ export const Text = (text: string): Token => ({
 })
 
 /**
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const Comment = (comment: string): Token => ({
@@ -109,7 +109,7 @@ export const Comment = (comment: string): Token => ({
 })
 
 /**
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const Attribute = (key: string, value: string): Attribute => ({
@@ -122,7 +122,7 @@ export const Attribute = (key: string, value: string): Attribute => ({
 // -------------------------------------------------------------------------------------
 
 /**
- * @internal
+ * @category destructors
  * @since 0.0.1
  */
 export const fold = <R>(patterns: {
@@ -155,7 +155,7 @@ export const fold = <R>(patterns: {
 /**
  * Reduces the complexity of a tokenized HTML document by dropping empty `Text` tokens.
  *
- * @internal
+ * @category combinators
  * @since 0.0.1
  */
 export const canonicalizeTokens: Endomorphism<ReadonlyArray<Token>> = flow(
@@ -177,7 +177,7 @@ export const canonicalizeTokens: Endomorphism<ReadonlyArray<Token>> = flow(
 // -------------------------------------------------------------------------------------
 
 /**
- * @internal
+ * @category parsers
  * @since 0.0.1
  */
 export const parse = (source: string): ReadonlyArray<Token> => {
@@ -250,7 +250,7 @@ const showAttribute: Show<Attribute> = {
 }
 
 /**
- * @internal
+ * @category instances
  * @since 0.0.1
  */
 export const showToken: Show<Token> = {

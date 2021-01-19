@@ -66,7 +66,7 @@ export interface TagInfo {
 // -------------------------------------------------------------------------------------
 
 /**
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const TagInfo = (token: Token, closeOffset: Option<number>): TagInfo => ({
@@ -222,7 +222,7 @@ const traverseStateWithIndex = <A, S, B>(f: (i: number, a: A) => State<S, B>) =>
 /**
  * Annotates each parsed tag with the the offset to its closing tag, if present.
  *
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const annotateTags = (tokens: ReadonlyArray<Token>): ReadonlyArray<TagInfo> =>

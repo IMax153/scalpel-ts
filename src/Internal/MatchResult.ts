@@ -40,25 +40,25 @@ export type MatchCull = 'MatchCull'
 // -------------------------------------------------------------------------------------
 
 /**
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const MatchOk: MatchResult = 'MatchOk'
 
 /**
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const MatchFail: MatchResult = 'MatchFail'
 
 /**
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const MatchCull: MatchResult = 'MatchCull'
 
 /**
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const fromBoolean: (bool: boolean) => MatchResult = B.fold(
@@ -71,7 +71,7 @@ export const fromBoolean: (bool: boolean) => MatchResult = B.fold(
 // -------------------------------------------------------------------------------------
 
 /**
- * @internal
+ * @category destructors
  * @since 0.0.1
  */
 export const fold = <R>(patterns: {
@@ -99,7 +99,7 @@ export const fold = <R>(patterns: {
 // -------------------------------------------------------------------------------------
 
 /**
- * @internal
+ * @category instances
  * @since 0.0.1
  */
 export const semigroupMatchResult: Semigroup<MatchResult> = {

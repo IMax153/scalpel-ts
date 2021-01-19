@@ -30,7 +30,7 @@ export interface TagSpec {
 // -------------------------------------------------------------------------------------
 
 /**
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const TagSpec = (
@@ -46,7 +46,7 @@ export const TagSpec = (
 /**
  * Constructs a `TagSpec` from a stream of tokens parsed by the HTML parser.
  *
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const tagsToSpec = (tokens: ReadonlyArray<Token>): TagSpec => {

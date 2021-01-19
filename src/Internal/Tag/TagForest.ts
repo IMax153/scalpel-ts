@@ -48,7 +48,7 @@ export interface TagSpan {
 // -------------------------------------------------------------------------------------
 
 /**
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const TagSpan = (start: number, end: number): TagSpan => ({
@@ -108,7 +108,7 @@ const fixTree: Endomorphism<TagForest> = A.foldLeft(
  * The tree is organized such that for any node `n` in the tree, the parent node `x`
  * of `n` is the smallest span that completely encapsulates the span of `n`.
  *
- * @internal
+ * @category constructors
  * @since 0.0.1
  */
 export const fromTagInfo = (tokenInfo: ReadonlyArray<TagInfo>): TagForest => {
