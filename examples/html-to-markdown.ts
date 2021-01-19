@@ -2,27 +2,22 @@ import * as C from 'fp-ts/Console'
 import * as IO from 'fp-ts/IO'
 import * as IOE from 'fp-ts/IOEither'
 import * as M from 'fp-ts/Monoid'
-import * as O from 'fp-ts/Option'
 import * as RA from 'fp-ts/ReadonlyArray'
 import { absurd, flow, pipe, Endomorphism } from 'fp-ts/lib/function'
 
-import * as S from '../src/Scraper'
+import type { Scraper } from '../src/Scraper'
+import type { Selector } from '../src/Select'
+import * as F from '../src/Fetch'
+import * as Scrape from '../src/Scraper'
 import * as Select from '../src/Select'
 import * as Serial from '../src/SerialScraper'
-import { parse } from '../src/Internal/Html/Tokenizer'
 
 // -------------------------------------------------------------------------------------
 // model
 // -------------------------------------------------------------------------------------
 
-import Scraper = S.Scraper
-import Selector = Select.Selector
-
 type Markdown = string
 
-/**
- *
- */
 type FormattedText = PlainText | PlainTexts | Header | Paragraph | Bold | Italic | Link | Newline
 
 interface PlainText {
@@ -155,7 +150,7 @@ const fold = <R>(patterns: {
 // -------------------------------------------------------------------------------------
 
 /**
- * Prepends an element to every element in an array
+ * Prepends an element to every element in an array.
  */
 const prependToAll = <A>(e: A) => (xs: ReadonlyArray<A>): ReadonlyArray<A> => {
   if (xs.length === 0) return xs
@@ -167,6 +162,9 @@ const prependToAll = <A>(e: A) => (xs: ReadonlyArray<A>): ReadonlyArray<A> => {
   return ys
 }
 
+/**
+ * Places an element in between members of an array.
+ */
 const intersperse: <A>(e: A) => (as: ReadonlyArray<A>) => ReadonlyArray<A> = (e) => (as) => {
   if (RA.isEmpty(as)) return as
   return RA.cons(as[0], prependToAll(e)(as.slice(1, as.length)))
@@ -255,88 +253,91 @@ const printMd: (text: FormattedText) => string = flow(textToMarkdown, cleanupMd)
 // -------------------------------------------------------------------------------------
 
 const recurseOn = (selector: Selector): Scraper<ReadonlyArray<FormattedText>> =>
-  pipe(formattedTexts, S.chroot(pipe(selector, Select.atDepth(0))))
+  pipe(formattedTexts, Scrape.chroot(pipe(selector, Select.atDepth(0))))
 
 const formattedTexts: Scraper<ReadonlyArray<FormattedText>> = (spec) => {
-  const italic: Scraper<FormattedText> = pipe(recurseOn(Select.tag('em')), S.map(Italic))
+  const italic: Scraper<FormattedText> = pipe(recurseOn(Select.tag('em')), Scrape.map(Italic))
 
-  const bold: Scraper<FormattedText> = pipe(recurseOn(Select.tag('b')), S.map(Bold))
+  const bold: Scraper<FormattedText> = pipe(recurseOn(Select.tag('b')), Scrape.map(Bold))
 
-  const header: Scraper<FormattedText> = pipe(recurseOn(Select.tag('header')), S.map(Paragraph))
+  const header: Scraper<FormattedText> = pipe(
+    recurseOn(Select.tag('header')),
+    Scrape.map(Paragraph)
+  )
 
-  const paragraph: Scraper<FormattedText> = pipe(recurseOn(Select.tag('p')), S.map(Paragraph))
+  const paragraph: Scraper<FormattedText> = pipe(recurseOn(Select.tag('p')), Scrape.map(Paragraph))
 
   const plainText: Scraper<FormattedText> = pipe(
-    S.text(pipe(Select.text, Select.atDepth(0))),
-    S.map(PlainText)
+    Scrape.text(pipe(Select.text, Select.atDepth(0))),
+    Scrape.map(PlainText)
   )
 
   const newline: Scraper<FormattedText> = pipe(
-    S.matches(pipe(Select.tag('br'), Select.atDepth(0))),
-    S.map(() => Newline)
+    Scrape.matches(pipe(Select.tag('br'), Select.atDepth(0))),
+    Scrape.map(() => Newline)
   )
 
   const formatting: Scraper<FormattedText> = pipe(
     newline,
-    S.alt(() => paragraph),
-    S.alt(() => bold),
-    S.alt(() => italic),
-    S.alt(() => header),
-    S.alt(() => plainText)
+    Scrape.alt(() => paragraph),
+    Scrape.alt(() => bold),
+    Scrape.alt(() => italic),
+    Scrape.alt(() => header),
+    Scrape.alt(() => plainText)
   )
 
-  const h1: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h1')), S.map(Header(1)))
-  const h2: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h2')), S.map(Header(2)))
-  const h3: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h3')), S.map(Header(3)))
-  const h4: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h4')), S.map(Header(4)))
-  const h5: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h5')), S.map(Header(5)))
-  const h6: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h6')), S.map(Header(6)))
+  const h1: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h1')), Scrape.map(Header(1)))
+  const h2: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h2')), Scrape.map(Header(2)))
+  const h3: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h3')), Scrape.map(Header(3)))
+  const h4: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h4')), Scrape.map(Header(4)))
+  const h5: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h5')), Scrape.map(Header(5)))
+  const h6: Scraper<FormattedText> = pipe(recurseOn(Select.tag('h6')), Scrape.map(Header(6)))
   const headers: Scraper<FormattedText> = pipe(
     h1,
-    S.alt(() => h2),
-    S.alt(() => h3),
-    S.alt(() => h4),
-    S.alt(() => h5),
-    S.alt(() => h6)
+    Scrape.alt(() => h2),
+    Scrape.alt(() => h3),
+    Scrape.alt(() => h4),
+    Scrape.alt(() => h5),
+    Scrape.alt(() => h6)
   )
 
-  const unknown: Scraper<FormattedText> = pipe(recurseOn(Select.any), S.map(PlainTexts))
+  const unknown: Scraper<FormattedText> = pipe(recurseOn(Select.any), Scrape.map(PlainTexts))
 
   const nav: Scraper<FormattedText> = pipe(
     recurseOn(Select.tag('nav')),
-    S.map(() => PlainTexts(RA.empty))
+    Scrape.map(() => PlainTexts(RA.empty))
   )
 
   const noscript: Scraper<FormattedText> = pipe(
     recurseOn(Select.tag('noscript')),
-    S.map(() => PlainTexts(RA.empty))
+    Scrape.map(() => PlainTexts(RA.empty))
   )
 
   const script: Scraper<FormattedText> = pipe(
     recurseOn(Select.tag('script')),
-    S.map(() => PlainTexts(RA.empty))
+    Scrape.map(() => PlainTexts(RA.empty))
   )
 
   const skip: Scraper<FormattedText> = pipe(
     nav,
-    S.alt(() => noscript),
-    S.alt(() => script)
+    Scrape.alt(() => noscript),
+    Scrape.alt(() => script)
   )
 
   const link: Scraper<FormattedText> = pipe(
-    S.attr('href', Select.any),
-    S.bindTo('href'),
-    S.bind('texts', () => formattedTexts),
-    S.map(({ href, texts }) => Link(href, texts)),
-    S.chroot(pipe(Select.tag('a'), Select.atDepth(0)))
+    Scrape.attr('href', Select.any),
+    Scrape.bindTo('href'),
+    Scrape.bind('texts', () => formattedTexts),
+    Scrape.map(({ href, texts }) => Link(href, texts)),
+    Scrape.chroot(pipe(Select.tag('a'), Select.atDepth(0)))
   )
 
   const innerScraper: Scraper<FormattedText> = pipe(
     formatting,
-    S.alt(() => link),
-    S.alt(() => headers),
-    S.alt(() => skip),
-    S.alt(() => unknown)
+    Scrape.alt(() => link),
+    Scrape.alt(() => headers),
+    Scrape.alt(() => skip),
+    Scrape.alt(() => unknown)
   )
 
   const scraper: Scraper<ReadonlyArray<FormattedText>> = pipe(
@@ -348,17 +349,17 @@ const formattedTexts: Scraper<ReadonlyArray<FormattedText>> = (spec) => {
   return scraper(spec)
 }
 
-const formattedText: Scraper<FormattedText> = pipe(formattedTexts, S.map(PlainTexts))
+const formattedText: Scraper<FormattedText> = pipe(formattedTexts, Scrape.map(PlainTexts))
 
 const content: Scraper<FormattedText> = pipe(
   formattedText,
   // Prefer to extract just the article content.
-  S.chroot(Select.tag('article')),
-  S.alt(() =>
+  Scrape.chroot(Select.tag('article')),
+  Scrape.alt(() =>
     pipe(
       formattedText,
       // Fallback to everything in the body otherwise
-      S.chroot(Select.tag('body'))
+      Scrape.chroot(Select.tag('body'))
     )
   )
 )
@@ -382,17 +383,10 @@ const exampleHTML = `
 `
 
 const main: IO.IO<void> = pipe(
-  parse(exampleHTML),
+  content,
+  F.scrapeRaw(exampleHTML),
   IOE.fromEither,
-  IOE.mapLeft(() => 'Unable to parse the HTML'),
-  IOE.chain((tokens) =>
-    pipe(
-      tokens,
-      S.scrape(content),
-      O.map(printMd),
-      IOE.fromOption(() => 'Unable to scrape the HTML')
-    )
-  ),
+  IOE.map(printMd),
   IOE.fold(C.error, C.log)
 )
 

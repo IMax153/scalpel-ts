@@ -12,25 +12,25 @@ import { absurd } from 'fp-ts/function'
 /**
  * Represents the result of a `Selection`.
  *
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export type MatchResult = MatchOk | MatchFail | MatchCull
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export type MatchOk = 'MatchOk'
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export type MatchFail = 'MatchFail'
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export type MatchCull = 'MatchCull'
@@ -40,25 +40,25 @@ export type MatchCull = 'MatchCull'
 // -------------------------------------------------------------------------------------
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const MatchOk: MatchResult = 'MatchOk'
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const MatchFail: MatchResult = 'MatchFail'
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const MatchCull: MatchResult = 'MatchCull'
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const fromBoolean: (bool: boolean) => MatchResult = B.fold(
@@ -71,7 +71,7 @@ export const fromBoolean: (bool: boolean) => MatchResult = B.fold(
 // -------------------------------------------------------------------------------------
 
 /**
- * @category destructors
+ * @internal
  * @since 0.0.1
  */
 export const fold = <R>(patterns: {
@@ -99,7 +99,7 @@ export const fold = <R>(patterns: {
 // -------------------------------------------------------------------------------------
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const semigroupMatchResult: Semigroup<MatchResult> = {

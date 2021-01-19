@@ -3,6 +3,7 @@
  */
 import type { Option } from 'fp-ts/Option'
 import type { Tree } from 'fp-ts/Tree'
+import type { Endomorphism } from 'fp-ts/function'
 import * as A from 'fp-ts/Array'
 import * as Eq from 'fp-ts/Eq'
 import * as M from 'fp-ts/Monoid'
@@ -300,23 +301,52 @@ const matchAttrKey: (attribute: Attribute, key: Option<string>) => boolean = (at
  * @category combinators
  * @since 0.0.1
  */
-export const attribute = (key: Option<string>, value: string): AttributePredicate =>
+export const attribute = (key: string, value: string): AttributePredicate =>
   F.flow(
-    RA.map((attr) => foldAll([matchAttrKey(attr, key), attr.value === value])),
+    RA.map((attr) => foldAll([matchAttrKey(attr, O.some(key)), attr.value === value])),
+    foldAny
+  )
+
+/**
+ * The `anyAttribute` combinator creates an `AttributePredicate` that will match
+ * any attributes with the specified `value`.
+ *
+ * If attempting to match a specific class of a tag with potentially multiple classes,
+ * use `hasClass` instead.
+ *
+ * @category combinators
+ * @since 0.0.1
+ */
+export const anyAttribute = (value: string): AttributePredicate =>
+  F.flow(
+    RA.map((attr) => foldAll([matchAttrKey(attr, O.none), attr.value === value])),
     foldAny
   )
 
 /**
  * The `attributeRegex` combinator creates an `AttributePredicate` that will
- * match attributes with the specified `name` and whose value matches the
+ * match attributes with the specified `key` and whose value matches the
  * given `RegExp`.
  *
  * @category combinators
  * @since 0.0.1
  */
-export const attributeRegex = (key: Option<string>, regex: RegExp): AttributePredicate =>
+export const attributeRegex = (key: string, regex: RegExp): AttributePredicate =>
   F.flow(
-    RA.map((attr) => foldAll([matchAttrKey(attr, key), regex.test(attr.value)])),
+    RA.map((attr) => foldAll([matchAttrKey(attr, O.some(key)), regex.test(attr.value)])),
+    foldAny
+  )
+
+/**
+ * The `attributeRegex` combinator creates an `AttributePredicate` that will
+ * match any attributes whose value matches the given `RegExp`.
+ *
+ * @category combinators
+ * @since 0.0.1
+ */
+export const anyAttributeRegex = (regex: RegExp): AttributePredicate =>
+  F.flow(
+    RA.map((attr) => foldAll([matchAttrKey(attr, O.none), regex.test(attr.value)])),
     foldAny
   )
 
@@ -334,15 +364,17 @@ export const attributeRegex = (key: Option<string>, regex: RegExp): AttributePre
  * @category combinators
  * @since 0.0.1
  */
-export const atDepth = (depth: number) => (selector: Selector): Selector => {
-  const addDepth: F.Endomorphism<Selector> = RA.foldLeft(
-    () => RA.empty,
-    (x, xs) =>
-      RA.isEmpty(xs)
-        ? F.pipe(Selection(x.strategy, SelectSettings(O.some(depth))), RA.of)
-        : F.pipe(addDepth(xs), RA.cons(x))
-  )
-  return addDepth(selector)
+export const atDepth = (depth: number): ((selector: Selector) => Selector) => {
+  const addDepth: Endomorphism<Selector> = (selector) =>
+    F.pipe(
+      selector,
+      RA.reduceWithIndex<Selection, Selector>(RA.empty, (i, acc, curr) =>
+        i === selector.length - 1
+          ? RA.snoc(acc, Selection(curr.strategy, SelectSettings(O.some(depth))))
+          : RA.snoc(acc, curr)
+      )
+    )
+  return addDepth
 }
 
 /**
@@ -410,7 +442,7 @@ export const select = (selector: Selector) => (spec: TagSpec): ReadonlyArray<Tag
   F.pipe(
     RA.empty,
     selectNodes(selector, spec, spec),
-    RA.mapWithIndex((p, s) => TS.TagSpec(SelectContext(p, true), s.hierarchy, s.tokens))
+    RA.mapWithIndex((p, s) => TS.TagSpec(SelectContext(p, true), s.hierarchy, s.tags))
   )
 
 const recenter = (parent: TagSpan) => (child: TagSpan): TagSpan =>
@@ -421,11 +453,30 @@ const shrinkSpecWith = (spec: TagSpec, parent: Tree<TagSpan>): TagSpec => {
   return TS.TagSpec(
     spec.context,
     F.pipe(parent, Tr.map(recenter(parent.value)), A.of),
-    spec.tokens.slice(start, end + 1)
+    spec.tags.slice(start, end + 1)
   )
 }
+
 const updateHierarchy = (curr: TagSpec, hierarchy: TagForest): TagSpec =>
-  TS.TagSpec(curr.context, hierarchy, curr.tokens)
+  TS.TagSpec(curr.context, hierarchy, curr.tags)
+
+/**
+ * @internal
+ * @since 0.0.1
+ */
+export const liftSiblings = (acc: TagForest) => (
+  start: number,
+  end: number
+): F.Endomorphism<TagForest> =>
+  A.foldLeft(
+    () => acc,
+    (t, ts) =>
+      start < t.value.start && t.value.end < end
+        ? F.pipe(ts, liftSiblings(acc)(start, end), A.cons(t))
+        : end < t.value.start || t.value.end < start
+        ? F.pipe(ts, liftSiblings(acc)(start, end))
+        : F.pipe(ts, liftSiblings(acc)(start, end), liftSiblings(t.forest)(start, end))
+  )
 
 const selectNodes = (selectors: Selector, curr: TagSpec, root: TagSpec) => (
   acc: ReadonlyArray<TagSpec>
@@ -447,12 +498,7 @@ const selectNodes = (selectors: Selector, curr: TagSpec, root: TagSpec) => (
               // for each node that satisfies the condition
               if (RA.isEmpty(ns)) {
                 return F.pipe(
-                  curr.tokens,
-                  RA.lookup(start),
-                  O.fold(
-                    () => MR.MatchFail,
-                    (info) => nodeMatches(n, info, curr, root)
-                  ),
+                  nodeMatches(n, curr.tags[start], curr, root),
                   MR.fold({
                     MatchOk: () =>
                       F.pipe(
@@ -486,26 +532,10 @@ const selectNodes = (selectors: Selector, curr: TagSpec, root: TagSpec) => (
 
               // In order to match <c>, it must be lifted out of <b>'s subforest when
               // matching <a>.
-              const liftSiblings = (acc: TagForest): F.Endomorphism<TagForest> =>
-                A.foldLeft(
-                  () => acc,
-                  (t, ts) =>
-                    start < t.value.start && t.value.end < end
-                      ? F.pipe(ts, liftSiblings(acc), A.cons(t))
-                      : end < t.value.start || t.value.end < start
-                      ? F.pipe(ts, liftSiblings(acc))
-                      : F.pipe(ts, liftSiblings(acc), liftSiblings(t.forest))
-                )
-
-              const siblings = F.pipe(fs, liftSiblings([]))
+              const siblings = F.pipe(fs, liftSiblings(A.empty)(start, end))
 
               return F.pipe(
-                curr.tokens,
-                RA.lookup(start),
-                O.fold(
-                  () => MR.MatchFail,
-                  (info) => nodeMatches(n, info, curr, root)
-                ),
+                nodeMatches(n, curr.tags[start], curr, root),
                 MR.fold({
                   MatchOk: () =>
                     F.pipe(
@@ -570,18 +600,16 @@ const checkPredicates = (
     )
   )
 
-const eqOptionName = O.getEq<string>(Eq.eqString)
-
-const checkToken = (
-  name: string,
+const checkTag = (
+  tagName: string,
   predicates: ReadonlyArray<AttributePredicate>,
-  info: TagInfo
+  { token }: TagInfo
 ): MR.MatchResult => {
-  const x = checkPredicates(info.token, predicates)
+  const x = checkPredicates(token, predicates)
   const y = F.pipe(
-    info.token,
+    token,
     T.fold({
-      TagOpen: () => eqOptionName.equals(O.some(name), info.name),
+      TagOpen: (name) => Eq.eqString.equals(tagName.toLowerCase(), name.toLowerCase()),
       TagClose: F.constFalse,
       Text: F.constFalse,
       Comment: F.constFalse
@@ -595,24 +623,30 @@ const checkToken = (
  * Give an instance of `SelectSettings`, the current node under consideration, and
  * the last matched node, returns true IFF the current node satisfies all of the
  * selection setting
+ *
+ * @internal
  */
-const checkSettings = (settings: SelectSettings, current: TagSpec, root: TagSpec): MR.MatchResult =>
+export const checkSettings = (
+  { depth }: SelectSettings,
+  { hierarchy }: TagSpec,
+  root: TagSpec
+): MR.MatchResult =>
   F.pipe(
-    settings.depth,
+    depth,
     O.fold(
       () => MR.MatchOk,
       (depth) =>
         F.pipe(
-          current.hierarchy,
+          hierarchy,
           RA.foldLeft(
             () => MR.MatchOk,
-            (currentRoot) => {
+            (current) => {
               const monoidPredicate: M.Monoid<(s: TagSpan) => boolean> = M.getFunctionMonoid(
                 M.monoidAll
               )<TagSpan>()
 
-              const isChildOf = (s: TagSpan): boolean => s.start < currentRoot.value.start
-              const exceedsDepth = (s: TagSpan): boolean => currentRoot.value.end < s.end
+              const isChildOf = (s: TagSpan): boolean => s.start < current.value.start
+              const exceedsDepth = (s: TagSpan): boolean => current.value.end < s.end
               const containsCurrent = monoidPredicate.concat(isChildOf, exceedsDepth)
 
               const currentDepth = F.pipe(
@@ -645,7 +679,7 @@ const nodeMatches = (
       SelectOne: (tag, preds) =>
         MR.semigroupMatchResult.concat(
           checkSettings(selection.settings, curr, root),
-          checkToken(tag, preds, info)
+          checkTag(tag, preds, info)
         ),
       SelectAny: (preds) =>
         MR.semigroupMatchResult.concat(

@@ -1,8 +1,9 @@
 /**
  * @since 0.0.1
  */
+import type { Option } from 'fp-ts/Option'
 import { Parser } from 'htmlparser2'
-import * as E from 'fp-ts/Either'
+import * as Eq from 'fp-ts/Eq'
 import * as M from 'fp-ts/Monoid'
 import * as O from 'fp-ts/Option'
 import * as RR from 'fp-ts/ReadonlyRecord'
@@ -14,16 +15,14 @@ import { absurd, flow, pipe, Endomorphism, identity } from 'fp-ts/function'
 // model
 // -------------------------------------------------------------------------------------
 
-import Either = E.Either
-
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export type Token = TagOpen | TagClose | Text | Comment
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface TagOpen {
@@ -33,7 +32,7 @@ export interface TagOpen {
 }
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface TagClose {
@@ -42,7 +41,7 @@ export interface TagClose {
 }
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface Text {
@@ -51,7 +50,7 @@ export interface Text {
 }
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface Comment {
@@ -60,7 +59,7 @@ export interface Comment {
 }
 
 /**
- * @category model
+ * @internal
  * @since 0.0.1
  */
 export interface Attribute {
@@ -73,7 +72,7 @@ export interface Attribute {
 // -------------------------------------------------------------------------------------
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const TagOpen = (name: string, attributes: ReadonlyArray<Attribute>): Token => ({
@@ -83,7 +82,7 @@ export const TagOpen = (name: string, attributes: ReadonlyArray<Attribute>): Tok
 })
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const TagClose = (name: string): Token => ({
@@ -92,7 +91,7 @@ export const TagClose = (name: string): Token => ({
 })
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const Text = (text: string): Token => ({
@@ -101,7 +100,7 @@ export const Text = (text: string): Token => ({
 })
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const Comment = (comment: string): Token => ({
@@ -110,7 +109,7 @@ export const Comment = (comment: string): Token => ({
 })
 
 /**
- * @category constructors
+ * @internal
  * @since 0.0.1
  */
 export const Attribute = (key: string, value: string): Attribute => ({
@@ -123,7 +122,7 @@ export const Attribute = (key: string, value: string): Attribute => ({
 // -------------------------------------------------------------------------------------
 
 /**
- * @category destructors
+ * @internal
  * @since 0.0.1
  */
 export const fold = <R>(patterns: {
@@ -154,10 +153,12 @@ export const fold = <R>(patterns: {
 // -------------------------------------------------------------------------------------
 
 /**
- * Reduces the complexity of a tokenized HTML document by melding neighboring
- * `Text` tokens together and dropping empty `Text` tokens.
+ * Reduces the complexity of a tokenized HTML document by dropping empty `Text` tokens.
+ *
+ * @internal
+ * @since 0.0.1
  */
-const canonicalizeTokens: Endomorphism<ReadonlyArray<Token>> = flow(
+export const canonicalizeTokens: Endomorphism<ReadonlyArray<Token>> = flow(
   RA.filterMap((x) =>
     pipe(
       x,
@@ -168,18 +169,6 @@ const canonicalizeTokens: Endomorphism<ReadonlyArray<Token>> = flow(
         Comment: () => O.some(x)
       })
     )
-  ),
-  RA.reduce<Token, ReadonlyArray<Token>>(RA.empty, (xs, x) =>
-    pipe(
-      xs,
-      RA.foldLeft(
-        () => RA.of(x),
-        (y, ys) =>
-          x._tag === 'Text' && y._tag === 'Text'
-            ? RA.cons(Text(x.text + y.text), ys)
-            : RA.cons(x, RA.cons(y, ys))
-      )
-    )
   )
 )
 
@@ -188,54 +177,68 @@ const canonicalizeTokens: Endomorphism<ReadonlyArray<Token>> = flow(
 // -------------------------------------------------------------------------------------
 
 /**
- * @category parsers
+ * @internal
  * @since 0.0.1
  */
-export const parse = (source: string): Either<string, ReadonlyArray<Token>> => {
-  let error: O.Option<string> = O.none
+export const parse = (source: string): ReadonlyArray<Token> => {
+  // Track the starting and ending index of the parser so that
+  // self-closing tags can be recognized
+  let startIndex: Option<number> = O.none
+  let endIndex: Option<number> = O.none
+  const eqOption = O.getEq(Eq.eqNumber)
 
   const tokens: Array<Token> = []
 
-  const parser = new Parser({
-    onopentag: (name, attrs) => {
-      const attributes = pipe(
-        attrs,
-        RR.collect((key, value) => Attribute(key, value))
-      )
-      const token = TagOpen(name, attributes)
+  const parser = new Parser(
+    {
+      onopentag: (name, attrs) => {
+        startIndex = O.some(parser.startIndex)
+        endIndex = O.fromNullable(parser.endIndex)
 
-      tokens.push(token)
-    },
-    onclosetag: (name) => {
-      const token = TagClose(name)
+        const attributes = pipe(
+          attrs,
+          RR.collect((key, value) => Attribute(key, value))
+        )
+        const token = TagOpen(name, attributes)
 
-      tokens.push(token)
-    },
-    ontext: (text) => {
-      const token = Text(text)
+        tokens.push(token)
+      },
+      onclosetag: (name) => {
+        if (
+          // If the starting and ending index of the parser are
+          // exactly equal to what they were in the previous opening
+          // tag, then `onclosetag` is being called for a self-closing
+          // tag and we can ignore it
+          M.fold(M.monoidAll)([
+            eqOption.equals(O.some(parser.startIndex), startIndex),
+            eqOption.equals(O.fromNullable(parser.endIndex), endIndex)
+          ])
+        ) {
+          return
+        }
 
-      tokens.push(token)
-    },
-    oncomment: (comment) => {
-      const token = Comment(comment)
+        const token = TagClose(name)
 
-      tokens.push(token)
+        tokens.push(token)
+      },
+      ontext: (text) => {
+        const token = Text(text.trim())
+
+        tokens.push(token)
+      },
+      oncomment: (comment) => {
+        const token = Comment(comment)
+
+        tokens.push(token)
+      }
     },
-    onerror: (err) => {
-      error = O.some(err.message)
-    }
-  })
+    { recognizeSelfClosing: true }
+  )
 
   parser.write(source)
   parser.end()
 
-  return pipe(
-    error,
-    O.fold<string, E.Either<string, ReadonlyArray<Token>>>(
-      () => pipe(canonicalizeTokens(tokens), E.right),
-      E.left
-    )
-  )
+  return canonicalizeTokens(tokens)
 }
 
 // -------------------------------------------------------------------------------------
@@ -243,18 +246,18 @@ export const parse = (source: string): Either<string, ReadonlyArray<Token>> => {
 // -------------------------------------------------------------------------------------
 
 const showAttribute: Show<Attribute> = {
-  show: ({ key, value }) => `${key}="${value}"`
+  show: ({ key, value }) => ` ${key}="${value}"`
 }
 
 /**
- * @category instances
+ * @internal
  * @since 0.0.1
  */
 export const showToken: Show<Token> = {
   show: fold({
-    TagOpen: (name, attrs) => `<${name} ${RA.foldMap(M.monoidString)(showAttribute.show)(attrs)}>`,
-    TagClose: (name) => `<${name}>`,
+    TagOpen: (name, attrs) => `<${name}${RA.foldMap(M.monoidString)(showAttribute.show)(attrs)}>`,
+    TagClose: (name) => `</${name}>`,
     Text: identity,
-    Comment: (comment) => `<!-- ${comment} -->`
+    Comment: (comment) => `<!--${comment}-->`
   })
 }

@@ -1,24 +1,19 @@
 /**
  * @since 0.0.1
  */
-import type { Either } from 'fp-ts/Either'
 import type { Option } from 'fp-ts/Option'
-import type { TaskEither } from 'fp-ts/TaskEither'
-import * as E from 'fp-ts/Either'
 import * as M from 'fp-ts/Monoid'
 import * as O from 'fp-ts/Option'
 import * as RA from 'fp-ts/ReadonlyArray'
-import * as TE from 'fp-ts/TaskEither'
-import { flow, identity, not, pipe } from 'fp-ts/function'
+import { constVoid, flow, identity, not, pipe } from 'fp-ts/function'
 
 import type { Attribute } from './Internal/Html/Tokenizer'
+import type { TagSpec } from './Internal/Tag/TagSpec'
 import type { ReaderOption } from './Internal/ReaderOption'
 import type { Selector } from './Select'
-import type { TagSpec } from './Internal/Tag/TagSpec'
 import * as T from './Internal/Html/Tokenizer'
 import * as RO from './Internal/ReaderOption'
 import * as TS from './Internal/Tag/TagSpec'
-import * as F from './Fetch'
 import * as S from './Select'
 
 export * from './Internal/ReaderOption'
@@ -32,61 +27,6 @@ export * from './Internal/ReaderOption'
  * @since 0.0.1
  */
 export type Scraper<A> = ReaderOption<TagSpec, A>
-
-// -------------------------------------------------------------------------------------
-// scraping
-// -------------------------------------------------------------------------------------
-
-/**
- * The `scrape` function executes a `Scraper` on a stream of `Token`s and produces
- * an optional value of type `A`.
- *
- * @category scraping
- * @since 0.0.1
- */
-export const scrape = <A>(scraper: Scraper<A>): ((tags: ReadonlyArray<T.Token>) => Option<A>) =>
-  flow(TS.tokensToSpec, scrapeTagSpec(scraper))
-
-/**
- * The `scrapeRaw` function executes a `Scraper` on the `source` and produces either
- * a value of type `A` or an error message.
- *
- * @category scraping
- * @since 0.0.1
- */
-export const scrapeRaw = (source: string) => <A>(scraper: Scraper<A>): Either<string, A> =>
-  pipe(
-    T.parse(source),
-    E.chain(
-      flow(
-        scrape(scraper),
-        E.fromOption(() => 'Failed to scrape source')
-      )
-    )
-  )
-
-/**
- * The `scrapeURL` function executes a `Scraper` on the source text from the specified
- * `url` and returns a `Promise` which resolves to either a value of type `A` or an
- * error message.
- *
- * @category scraping
- * @since 0.0.1
- */
-export const scrapeURL = (url: RequestInfo, init?: RequestInit) => <A>(
-  scraper: Scraper<A>
-): TaskEither<string, A> =>
-  pipe(
-    F.text(url, init),
-    TE.mapLeft(
-      F.foldError({
-        NetworkError: (message) => `[Network Error]: ${message}`,
-        DecodeError: (message) => `[Decode Error]: ${message}`,
-        ResponseError: (message, status) => `[Response Error]: Status ${status}, ${message}`
-      })
-    ),
-    TE.chainEitherK((source) => pipe(scraper, scrapeRaw(source)))
-  )
 
 // -------------------------------------------------------------------------------------
 // combinators
@@ -123,17 +63,17 @@ export const chroot = (selector: Selector): (<A>(scraper: Scraper<A>) => Scraper
   flow(chroots(selector), RO.chainOptionK(flow(RA.head)))
 
 /**
- * The `matches` combinator takes a `Selector` and returns `true` if the specified
- * `selector` matches any node in the DOM, otherwise it returns `false`.
+ * The `matches` combinator takes a `Selector` and returns `void` if the specified
+ * `selector` matches any node in the DOM.
  *
  * @category combinators
  * @since 0.0.1
  */
-export const matches = (selector: Selector): Scraper<ReadonlyArray<TagSpec>> =>
+export const matches = (selector: Selector): Scraper<void> =>
   pipe(
     RO.asks(S.select(selector)),
-    RO.chain<TagSpec, ReadonlyArray<TagSpec>, ReadonlyArray<TagSpec>>(
-      RO.fromPredicate(not(RA.isEmpty))
+    RO.chain<TagSpec, ReadonlyArray<TagSpec>, void>(
+      flow(RO.fromPredicate(not(RA.isEmpty)), RO.map(constVoid))
     )
   )
 
@@ -288,6 +228,16 @@ export const position: Scraper<number> = RO.asks((spec) => tagsToPosition(spec))
 // -------------------------------------------------------------------------------------
 
 /**
+ * The `scrape` function executes a `Scraper` on a stream of `Token`s and produces
+ * an optional value of type `A`.
+ *
+ * @category utils
+ * @since 0.0.1
+ */
+export const scrape = <A>(scraper: Scraper<A>): ((tags: ReadonlyArray<T.Token>) => Option<A>) =>
+  flow(TS.tagsToSpec, scrapeTagSpec(scraper))
+
+/**
  * A convenience method to "run" the `Scraper`.
  */
 const scrapeTagSpec = <A>(scraper: Scraper<A>) => (tagSpec: TagSpec): Option<A> => scraper(tagSpec)
@@ -312,7 +262,7 @@ const withAll = <A, B>(f: (a: A) => B): ((as: ReadonlyArray<A>) => Scraper<Reado
  */
 const foldSpec = <B>(M: M.Monoid<B>) => (f: (a: T.Token) => B) => (spec: TagSpec): B =>
   pipe(
-    spec.tokens,
+    spec.tags,
     RA.foldMap(M)((info) => f(info.token))
   )
 
@@ -343,14 +293,20 @@ const getAttribute = (key: string): ((attributes: ReadonlyArray<Attribute>) => O
  * Maps over the tokens in a `TagSpec` returning the value of the first attribute
  * that matches the specified `key` on each token, if present.
  */
-const tagsToAttr = (key: string): ((spec: TagSpec) => Option<string>) =>
-  foldSpec(O.getMonoid(M.monoidString))(
-    T.fold({
-      TagOpen: (_, attrs) => pipe(attrs, getAttribute(key)),
-      TagClose: () => O.none,
-      Text: () => O.none,
-      Comment: () => O.none
-    })
+const tagsToAttr = (key: string) => ({ tags }: TagSpec): Option<string> =>
+  pipe(
+    tags,
+    RA.findFirstMap(({ token }) =>
+      pipe(
+        token,
+        T.fold({
+          TagOpen: (_, attrs) => pipe(attrs, getAttribute(key)),
+          TagClose: () => O.none,
+          Text: () => O.none,
+          Comment: () => O.none
+        })
+      )
+    )
   )
 
 /**
@@ -365,10 +321,8 @@ const tagsToHtml: (spec: TagSpec) => string = foldSpec(M.monoidString)(T.showTok
  * set of tags within, but not including, the selected tags.
  */
 const tagsToInnerHTML: (spec: TagSpec) => string = (spec) => {
-  const len = spec.tokens.length
-  return len < 2
-    ? M.monoidString.empty
-    : tagsToHtml({ ...spec, tokens: spec.tokens.slice(1, len - 2) })
+  const len = spec.tags.length
+  return len < 2 ? M.monoidString.empty : tagsToHtml({ ...spec, tags: spec.tags.slice(1, len - 1) })
 }
 
 /**
