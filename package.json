@@ -1,6 +1,6 @@
 {
   "name": "scalpel-ts",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "author": "Maxwell Brown <maxwellbrown1990@gmail.com> (https://github.com/IMax153)",
   "description": "A porting of Haskell's scalpel web scraper to TypeScript",
   "license": "MIT",
