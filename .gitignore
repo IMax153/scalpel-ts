@@ -46,6 +46,7 @@ typings/
 
 # TypeScript build output
 /lib
+/es6
 
 # TypeScript cache
 *.tsbuildinfo
