@@ -1,7 +1,12 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": false
+    "outDir": "build/esm",
+    "declarationDir": "build/dts",
+    "tsBuildInfoFile": "build/tsbuildinfo/esm.tsbuildinfo",
+    "rootDir": "src"
   },
-  "include": ["src"]
+  "include": [
+    "src/**/*.ts"
+  ]
 }

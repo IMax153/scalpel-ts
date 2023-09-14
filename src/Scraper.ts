@@ -1,104 +1,18 @@
 /**
- * @since 0.0.1
+ * @since 1.0.0
  */
-import type { Option } from 'fp-ts/Option'
-import * as M from 'fp-ts/Monoid'
-import * as O from 'fp-ts/Option'
-import * as RA from 'fp-ts/ReadonlyArray'
-import { constVoid, flow, identity, not, pipe } from 'fp-ts/function'
-
-import type { Attribute } from './Internal/Html/Tokenizer'
-import type { TagSpec } from './Internal/Tag/TagSpec'
-import type { ReaderOption } from './Internal/ReaderOption'
-import type { Selector } from './Select'
-import * as T from './Internal/Html/Tokenizer'
-import * as RO from './Internal/ReaderOption'
-import * as TS from './Internal/Tag/TagSpec'
-import * as S from './Select'
-
-export * from './Internal/ReaderOption'
-
-// -------------------------------------------------------------------------------------
-// model
-// -------------------------------------------------------------------------------------
+import type * as Option from "@effect/data/Option"
+import type * as Effect from "@effect/io/Effect"
+import type * as HtmlTokenizer from "@effect/scraper/HtmlTokenizer"
+import * as internal from "@effect/scraper/internal/scraper"
+import type * as Select from "@effect/scraper/Select"
+import type * as TagSpec from "@effect/scraper/TagSpec"
 
 /**
- * @category model
- * @since 0.0.1
+ * @since 1.0.0
+ * @category models
  */
-export type Scraper<A> = ReaderOption<TagSpec, A>
-
-// -------------------------------------------------------------------------------------
-// combinators
-// -------------------------------------------------------------------------------------
-
-/**
- * The `chroots` combinator takes a `Selector` and an inner `Scraper` and executes
- * the inner `scraper` as if it were scraping a document that consists solely of the
- * tags corresponding to the specified `selector`.
- *
- * The inner scraper is executed for each set of tags (possibly nested) matching
- * the given selector.
- *
- * @category combinators
- * @since 0.0.1
- */
-export const chroots = (selector: Selector) => <A>(
-  scraper: Scraper<A>
-): Scraper<ReadonlyArray<A>> =>
-  pipe(RO.asks(S.select(selector)), RO.map(flow(RA.map(scraper), RA.compact)))
-
-/**
- * The `chroot` combinator takes a `Selector` and an inner `Scraper` and executes
- * the inner `scraper` as if it were scraping a document that consists solely of the
- * tags corresponding to the specified `selector`.
- *
- * This function will only match the first set of tags that match the selector. To
- * match every set of tags, use `chroots`.
- *
- * @category combinators
- * @since 0.0.1
- */
-export const chroot = (selector: Selector): (<A>(scraper: Scraper<A>) => Scraper<A>) =>
-  flow(chroots(selector), RO.chainOptionK(flow(RA.head)))
-
-/**
- * The `matches` combinator takes a `Selector` and returns `void` if the specified
- * `selector` matches any node in the DOM.
- *
- * @category combinators
- * @since 0.0.1
- */
-export const matches = (selector: Selector): Scraper<void> =>
-  pipe(
-    RO.asks(S.select(selector)),
-    RO.chain<TagSpec, ReadonlyArray<TagSpec>, void>(
-      flow(RO.fromPredicate(not(RA.isEmpty)), RO.map(constVoid))
-    )
-  )
-
-/**
- * The `text` combinator takes a `Selector` and returns the inner text from
- * the set of tags matched by the specified `selector`.
- *
- * This function will only return the first set of tags matched by the
- * selector. To match every tag, use `texts`.
- *
- * @category combinators
- * @since 0.0.1
- */
-export const text = (selector: Selector): Scraper<string> =>
-  pipe(RO.asks(S.select(selector)), RO.chain(withFirst(tagsToText)))
-
-/**
- * The `text` combinator takes a `Selector` and returns the inner text from
- * every set of tags (possibly nested) matched by the specified `selector`.
- *
- * @category combinators
- * @since 0.0.1
- */
-export const texts = (selector: Selector): Scraper<ReadonlyArray<string>> =>
-  pipe(RO.asks(S.select(selector)), RO.chain(withAll(tagsToText)))
+export type Scraper<A> = Effect.Effect<TagSpec.TagSpec, never, Option.Option<A>>
 
 /**
  * The `attr` combinator takes an attribute `key` and a `Selector` and
@@ -108,49 +22,52 @@ export const texts = (selector: Selector): Scraper<ReadonlyArray<string>> =>
  * This function will only return the first opening tag matched by the
  * selector. To match every tag, use `attrs`.
  *
+ * @since 1.0.0
  * @category combinators
- * @since 0.0.1
  */
-export const attr = (key: string, selector: Selector): Scraper<string> =>
-  pipe(
-    RO.asks(S.select(selector)),
-    RO.chainOptionK(flow(RA.map(tagsToAttr(key)), RA.compact, RA.head))
-  )
+export const attr: (key: string, selector: Select.Selector) => Scraper<string> = internal.attr
 
 /**
  * The `attrs` combinator takes an attribute `key` and a `Selector` and
  * returns the value of the attribute with the specified `key` for every
  * opening tag (possibly nested) that matches the specified `selector`.
  *
+ * @since 1.0.0
  * @category combinators
- * @since 0.0.1
  */
-export const attrs = (key: string, selector: Selector): Scraper<ReadonlyArray<string>> =>
-  pipe(RO.asks(S.select(selector)), RO.map(flow(RA.map(tagsToAttr(key)), RA.compact)))
+export const attrs: (key: string, selector: Select.Selector) => Scraper<ReadonlyArray<string>> = internal.attrs
 
 /**
- * The `html` combinator takes a `Selector` and returns the HTML string
- * representation of the tags matched by the specified `selector`.
+ * The `chroot` combinator takes a `Selector` and an inner `Scraper` and executes
+ * the inner `scraper` as if it were scraping a document that consists solely of the
+ * tags corresponding to the specified `selector`.
  *
- * This function will only return the HTML string for the first tag
- * matched by the selector. To match every tag, use `htmls`.
+ * This function will only match the first set of tags that match the selector. To
+ * match every set of tags, use `chroots`.
  *
+ * @since 1.0.0
  * @category combinators
- * @since 0.0.1
  */
-export const html = (selector: Selector): Scraper<string> =>
-  pipe(RO.asks(S.select(selector)), RO.chain(withFirst(tagsToHtml)))
+export const chroot: {
+  (selector: Select.Selector): <A>(self: Scraper<A>) => Scraper<A>
+  <A>(self: Scraper<A>, selector: Select.Selector): Scraper<A>
+} = internal.chroot
 
 /**
- * The `htmls` combinator takes a `Selector` and returns the HTML string
- * representation of every set of tags (possibly nested) matched by the
- * specified `selector`.
+ * The `chroots` combinator takes a `Selector` and an inner `Scraper` and executes
+ * the inner `scraper` as if it were scraping a document that consists solely of the
+ * tags corresponding to the specified `selector`.
  *
+ * The inner scraper is executed for each set of tags (possibly nested) matching
+ * the given selector.
+ *
+ * @since 1.0.0
  * @category combinators
- * @since 0.0.1
  */
-export const htmls = (selector: Selector): Scraper<ReadonlyArray<string>> =>
-  pipe(RO.asks(S.select(selector)), RO.chain(withAll(tagsToHtml)))
+export const chroots: {
+  (selector: Select.Selector): <A>(self: Scraper<A>) => Scraper<ReadonlyArray<A>>
+  <A>(self: Scraper<A>, selector: Select.Selector): Scraper<ReadonlyArray<A>>
+} = internal.chroots
 
 /**
  * The `innerHTML` combinator takes a `Selector` and returns the inner HTML
@@ -161,11 +78,10 @@ export const htmls = (selector: Selector): Scraper<ReadonlyArray<string>> =>
  * This function will only return the HTML string for the first tag matched
  * by the selector. To match every tag, use `innerHTMLs`.
  *
+ * @since 1.0.0
  * @category combinators
- * @since 0.0.1
  */
-export const innerHTML = (selector: Selector): Scraper<string> =>
-  pipe(RO.asks(S.select(selector)), RO.chain(withFirst(tagsToInnerHTML)))
+export const innerHTML: (selector: Select.Selector) => Scraper<string> = internal.innerHTML
 
 /**
  * The `innerHTMLs` combinator takes a `Selector` and returns the inner HTML
@@ -173,17 +89,37 @@ export const innerHTML = (selector: Selector): Scraper<string> =>
  * the specified `selector`. In this case, *inner html* refers to the set of
  * tags within, but not including, the selected tags.
  *
+ * @since 1.0.0
  * @category combinators
- * @since 0.0.1
  */
-export const innerHTMLs = (selector: Selector): Scraper<ReadonlyArray<string>> =>
-  pipe(RO.asks(S.select(selector)), RO.chain(withAll(tagsToInnerHTML)))
+export const innerHTMLs: (selector: Select.Selector) => Scraper<ReadonlyArray<string>> = internal.innerHTMLs
+
+/**
+ * The `html` combinator takes a `Selector` and returns the HTML string
+ * representation of the tags matched by the specified `selector`.
+ *
+ * This function will only return the HTML string for the first tag
+ * matched by the selector. To match every tag, use `htmls`.
+ *
+ * @since 1.0.0
+ * @category combinators
+ */
+export const html: (selector: Select.Selector) => Scraper<string> = internal.html
+
+/**
+ * The `htmls` combinator takes a `Selector` and returns the HTML string
+ * representation of every set of tags (possibly nested) matched by the
+ * specified `selector`.
+ *
+ * @since 1.0.0
+ * @category combinators
+ */
+export const htmls: (selector: Select.Selector) => Scraper<ReadonlyArray<string>> = internal.htmls
 
 /**
  * The `position` combinator is designed to be used to extract the position
  * of each HTML tag within the currently matched subtree. It is primarily
- * intended to be used in combination with the `chroots` combinator and the
- * `do`-notation helpers.
+ * intended to be used in combination with the `chroots` combinator.
  *
  * For example, consider the following HTML:
  *
@@ -198,134 +134,98 @@ export const innerHTMLs = (selector: Selector): Scraper<ReadonlyArray<string>> =
  * The `position` combinator can be used to determine the index of each `<p />`
  * tag tag within the `<article />` tag as follows:
  *
- * ```typescript
- * import { pipe } from 'fp-ts/function'
- * import * as S from 'scalpel-ts/Scraper'
- * import * as Select from 'scalpel-ts/Select'
+ * ```ts
+ * import { pipe } from "@effect/data/Function"
+ * import * as Option from "@effect/data/Option"
+ * import * as Effect from "@effect/io/Effect"
+ * import * as HtmlTokenizer from "@effect/scraper/HtmlTokenizer"
+ * import * as Scraper from "@effect/scraper/Scraper"
+ * import * as Select from "@effect/scraper/Select"
  *
- * S.scrape(
- *   pipe(
- *     S.position,
- *     S.bindTo('index'),
- *     S.bind('content', () => S.texts(Select.tag('p'))),
- *     S.chroots(pipe(Select.tag('article'), Select.nested(Select.tag('p'))))
- *   )
+ * const source = `
+ * <article>
+ *   <p>First paragraph.</p>
+ *   <p>Second paragraph.</p>
+ *   <p>Third paragraph.</p>
+ * </article>
+ * `
+ *
+ * const selector = pipe(
+ *   Select.tag("article"),
+ *   Select.nested(Select.tag("p"))
  * )
- * // [
- * //   { index: 0, content: [ 'First paragraph.' ] },
- * //   { index: 1, content: [ 'Second paragraph.' ] },
- * //   { index: 2, content: [ 'Third paragraph.' ] }
- * // ]
+ *
+ * const program = Effect.gen(function*($) {
+ *   const index = yield* $(Scraper.position)
+ *   const content = yield* $(Scraper.texts(Select.tag("p")))
+ *   return Option.all({ index, content })
+ * }).pipe(
+ *   Scraper.chroots(selector),
+ *   Scraper.scrape(source),
+ *   Effect.provideLayer(HtmlTokenizer.layer)
+ * )
+ *
+ * Effect.runPromise(program).then((result) => console.dir(result, { depth: null }))
+ *
+ * // {
+ * //   value: [
+ * //     { index: 0, content: [ 'First paragraph.' ] },
+ * //     { index: 1, content: [ 'Second paragraph.' ] },
+ * //     { index: 2, content: [ 'Third paragraph.' ] }
+ * //   ]
+ * // }
  * ```
  *
+ * @since 1.0.0
  * @category combinators
- * @since 0.0.1
  */
-export const position: Scraper<number> = RO.asks((spec) => tagsToPosition(spec))
-
-// -------------------------------------------------------------------------------------
-// utils
-// -------------------------------------------------------------------------------------
+export const position: Scraper<number> = internal.position
 
 /**
- * The `scrape` function executes a `Scraper` on a stream of `Token`s and produces
- * an optional value of type `A`.
+ * The `satisfies` combinator takes a `Selector` and returns `void` if the
+ * specified `selector` matches any node.
  *
- * @category utils
- * @since 0.0.1
+ * @since 1.0.0
+ * @category combinators
  */
-export const scrape = <A>(scraper: Scraper<A>): ((tags: ReadonlyArray<T.Token>) => Option<A>) =>
-  flow(TS.tagsToSpec, scrapeTagSpec(scraper))
+export const satisfies: (selector: Select.Selector) => Scraper<void> = internal.satisfies
 
 /**
- * A convenience method to "run" the `Scraper`.
+ * The `scrape` function executes a `Scraper` on a sequence of `Token`s and
+ * produces an optional value of type `A`.
+ *
+ * @since 1.0.0
+ * @category scraping
  */
-const scrapeTagSpec = <A>(scraper: Scraper<A>) => (tagSpec: TagSpec): Option<A> => scraper(tagSpec)
+export const scrape: {
+  (
+    source: string
+  ): <A>(
+    self: Scraper<A>
+  ) => Effect.Effect<HtmlTokenizer.HtmlTokenizer, Error, Option.Option<A>>
+  <A>(
+    self: Scraper<A>,
+    source: string
+  ): Effect.Effect<HtmlTokenizer.HtmlTokenizer, Error, Option.Option<A>>
+} = internal.scrape
 
 /**
- * Takes a function which maps over the results of a `Selection` and returns the
- * first result as a `Scraper`.
+ * The `text` combinator takes a `Selector` and returns the inner text from
+ * the set of tags matched by the specified `selector`.
+ *
+ * This function will only return the first set of tags matched by the
+ * selector. To match every tag, use `texts`.
+ *
+ * @since 1.0.0
+ * @category combinators
  */
-const withFirst = <A, B>(f: (a: A) => B): ((as: ReadonlyArray<A>) => Scraper<B>) =>
-  flow(RA.head, O.map(f), RO.fromOption)
+export const text: (selector: Select.Selector) => Scraper<string> = internal.text
 
 /**
- * Takes a function which maps over the results of a `Selection` and returns the
- * first result as a `Scraper`.
+ * The `text` combinator takes a `Selector` and returns the inner text from
+ * every set of tags (possibly nested) matched by the specified `selector`.
+ *
+ * @since 1.0.0
+ * @category combinators
  */
-const withAll = <A, B>(f: (a: A) => B): ((as: ReadonlyArray<A>) => Scraper<ReadonlyArray<B>>) =>
-  RA.traverse(RO.Applicative)(flow(f, RO.some))
-
-/**
- * Takes a function which maps over the tokens in a `TagSpec` and combines them
- * using the specified `Monoid`.
- */
-const foldSpec = <B>(M: M.Monoid<B>) => (f: (a: T.Token) => B) => (spec: TagSpec): B =>
-  pipe(
-    spec.tags,
-    RA.foldMap(M)((info) => f(info.token))
-  )
-
-/**
- * Maps over the tokens in a `TagSpec` returning the text from `ContentText`
- * and `ContentChar` tokens.
- */
-const tagsToText: (spec: TagSpec) => string = foldSpec(M.monoidString)(
-  T.fold({
-    TagOpen: () => M.monoidString.empty,
-    TagClose: () => M.monoidString.empty,
-    Text: identity,
-    Comment: () => M.monoidString.empty
-  })
-)
-
-/**
- * Returns the value of the first attribute matching the specified `key`,
- * if present.
- */
-const getAttribute = (key: string): ((attributes: ReadonlyArray<Attribute>) => Option<string>) =>
-  flow(
-    RA.filterMap((attr) => (attr.key === key ? O.some(attr.value) : O.none)),
-    RA.head
-  )
-
-/**
- * Maps over the tokens in a `TagSpec` returning the value of the first attribute
- * that matches the specified `key` on each token, if present.
- */
-const tagsToAttr = (key: string) => ({ tags }: TagSpec): Option<string> =>
-  pipe(
-    tags,
-    RA.findFirstMap(({ token }) =>
-      pipe(
-        token,
-        T.fold({
-          TagOpen: (_, attrs) => pipe(attrs, getAttribute(key)),
-          TagClose: () => O.none,
-          Text: () => O.none,
-          Comment: () => O.none
-        })
-      )
-    )
-  )
-
-/**
- * Maps over the tokens in a `TagSpec` returning a HTML string representation of the
- * token stream.
- */
-const tagsToHtml: (spec: TagSpec) => string = foldSpec(M.monoidString)(T.showToken.show)
-
-/**
- * Maps over the tokens in a `TagSpec` returning a HTML string representation of the
- * inner HTML for each token in the stream. In this case, *inner html* refers to the
- * set of tags within, but not including, the selected tags.
- */
-const tagsToInnerHTML: (spec: TagSpec) => string = (spec) => {
-  const len = spec.tags.length
-  return len < 2 ? M.monoidString.empty : tagsToHtml({ ...spec, tags: spec.tags.slice(1, len - 1) })
-}
-
-/**
- * Maps a `TagSpec` into its corresponding position within the matched HTML document.
- */
-const tagsToPosition: (spec: TagSpec) => number = (spec) => spec.context.position
+export const texts: (selector: Select.Selector) => Scraper<ReadonlyArray<string>> = internal.texts
